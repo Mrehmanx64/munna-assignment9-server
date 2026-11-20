@@ -12,7 +12,8 @@
     "test:auth": "node test-auth.cjs",
     "test:equipment": "node test-equipment.cjs",
     "test:booking": "node test-booking.cjs",
-    "test:analytics": "node test-milestone6.cjs"
+    "test:analytics": "node test-milestone6.cjs",
+    "test:users": "node test-admin-users.cjs"
   },
   "repository": {
     "type": "git",
