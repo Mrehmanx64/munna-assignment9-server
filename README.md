@@ -1,6 +1,6 @@
 # Rentora — Backend API Server
 
-Production-grade Express + TypeScript backend foundation for the **Rentora** Equipment Rental Platform.
+Production-grade Express + TypeScript backend for the **Rentora** Equipment Rental Platform.
 
 ---
 
@@ -10,12 +10,12 @@ The server follows a clean, decoupled layer architecture:
 
 ```
 src/
-  ├── config/             # Environment, CORS, and MongoDB database configuration
-  ├── controllers/        # Request handlers delegating to services
-  ├── middlewares/        # Centralized error handler, 404 handler, Helmet, rate limiting
-  ├── models/             # Mongoose schemas & domain models (future milestones)
-  ├── routes/             # Express API routers and versioned endpoints
-  ├── services/           # Business logic layer (future milestones)
+  ├── config/             # Environment, CORS, BetterAuth, and MongoDB database configuration
+  ├── controllers/        # Request handlers (health, auth)
+  ├── middlewares/        # Centralized error handler, 404 handler, Helmet, rate limiting, verifyToken, RBAC
+  ├── models/             # Mongoose schemas & domain models (User)
+  ├── routes/             # Express API routers (health, auth, better-auth)
+  ├── services/           # Business logic layer (jwtService, authService)
   ├── types/              # Standardized API response, error, and domain interfaces
   ├── utils/              # ApiError, ResponseFormatter, asyncHandler wrappers
   ├── validators/         # Reusable Zod validation middleware and schemas
@@ -30,6 +30,7 @@ src/
 - **Runtime & Language**: Node.js, TypeScript (Target ES2022, CommonJS output)
 - **HTTP Framework**: Express.js (`v5.3.0`)
 - **Database**: MongoDB via Mongoose (`v9.12.2`)
+- **Authentication**: BetterAuth (`v1.7.27`) + MongoDB Adapter, JWT (`jsonwebtoken v9.0.3`), bcryptjs (`v3.0.3`)
 - **Validation**: Zod (`v4.6.7`)
 - **Security**: Helmet (`v8.3.0`), CORS (`v2.8.6`), express-rate-limit (`v8.7.5`)
 - **Utilities**: cookie-parser, dotenv
@@ -55,6 +56,8 @@ cp .env.example .env
 | `JWT_EXPIRES_IN` | JWT token expiration lifespan | `7d` |
 | `BETTER_AUTH_SECRET` | BetterAuth encryption secret | `rentora_default_better_auth...` |
 | `BETTER_AUTH_URL` | BetterAuth server endpoint | `http://localhost:5000` |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID (optional in dev) | `your_google_client_id...` |
+| `GOOGLE_CLIENT_SECRET`| Google OAuth Client Secret (optional in dev)| `your_google_client_secret...` |
 | `STRIPE_SECRET_KEY` | Stripe API secret key | `sk_test_placeholder` |
 | `IMGBB_API_KEY` | imgbb image hosting API key | `placeholder_imgbb_key` |
 
@@ -77,68 +80,70 @@ npm run start
 
 # Run automated smoke test
 npm run test:smoke
+
+# Run automated authentication & RBAC test suite
+npm run test:auth
 ```
 
 ---
 
-## 🩺 Endpoints (Foundation Milestone)
+## 🩺 Endpoints
 
-### 1. Root Gateway
-- **`GET /`**
-  - Status: `200 OK`
-  - Returns service status, version, and health check link.
+### 1. Root & Health Check
+- **`GET /`** — Service status and metadata
+- **`GET /api/health`** — Server telemetry, uptime, memory, and database status
 
-### 2. Health Check
-- **`GET /api/health`** (also accessible via `/api/v1/health`)
-  - Status: `200 OK`
-  - Returns service telemetry, uptime, Node environment, memory usage, and MongoDB connection status.
+### 2. Authentication & Authorization (`/api/auth`)
+- **`POST /api/auth/register`** — Register new user with email/password.
+  - Body: `{ name, email, password, confirmPassword?, role?, phone?, address?, avatarUrl? }`
+  - Enforces role sanitization (disallows client self-assignment of `admin`; defaults to `customer`).
+  - Sets HTTP-only `accessToken` cookie and returns `{ user, token }`.
+- **`POST /api/auth/login`** — Login with email and password.
+  - Body: `{ email, password }`
+  - Validates credentials against BetterAuth account collection.
+  - Sets HTTP-only `accessToken` cookie and returns `{ user, token }`.
+- **`POST /api/auth/google`** — Google OAuth sign-in / registration.
+  - Body: `{ idToken?, email, name?, avatarUrl? }`
+  - **Guaranteed: New Google registrations strictly default to `Customer` (`customer`) role**.
+  - Returns `{ user, token }`.
+- **`GET /api/auth/me`** — Current authenticated user profile.
+  - Header: `Authorization: Bearer <token>` or cookie `accessToken`.
+  - Enables persistent session across page reloads.
+- **`POST /api/auth/logout`** — Clears authentication cookie and session.
 
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "message": "Service health check",
-  "data": {
-    "service": "rentora-backend-api",
-    "status": "healthy",
-    "environment": "development",
-    "uptime": {
-      "seconds": 42,
-      "formatted": "0d 0h 0m 42s"
-    },
-    "timestamp": "2026-11-20T14:25:00.000Z",
-    "database": {
-      "status": "connected",
-      "host": "localhost",
-      "name": "rentora"
-    },
-    "memory": {
-      "heapUsedMB": 24.5,
-      "heapTotalMB": 38.2,
-      "rssMB": 52.1
-    }
-  },
-  "timestamp": "2026-11-20T14:25:00.000Z"
-}
-```
-
-### 3. Error Contract & 404 Handling
-- Any unhandled route returns a standardized `404 Not Found` payload:
-```json
-{
-  "success": false,
-  "statusCode": 404,
-  "message": "Route not found: GET /api/unknown-endpoint",
-  "errors": null,
-  "timestamp": "2026-11-20T14:25:00.000Z"
-}
-```
+### 3. Role-Based Access Control (RBAC) Verification Endpoints
+- **`GET /api/auth/test/protected`** — Accessible by any verified user (`verifyToken`).
+- **`GET /api/auth/test/renter`** — Accessible by `Customer` (Renter) and `Admin` (`verifyRenter`).
+- **`GET /api/auth/test/owner`** — Accessible by `Owner` and `Admin` (`verifyOwner`).
+- **`GET /api/auth/test/admin`** — Exclusively accessible by `Admin` (`verifyAdmin`).
 
 ---
 
-## 📜 Git Commit History (14 Commits)
+## 🛡️ Required Express Middlewares
+
+| Middleware | Description |
+|---|---|
+| `verifyToken` | Validates JWT from `Authorization: Bearer` header or HTTP-only cookie, attaching `req.user`. |
+| `verifyRenter` | Enforces Customer / Renter permissions (permits `customer`, `renter`, and `admin`). |
+| `verifyOwner` | Enforces Equipment Owner permissions (permits `owner` and `admin`). |
+| `verifyAdmin` | Enforces Platform Administrator permissions exclusively (`admin`). |
+| `authorizeRoles(...roles)` | Generic role checker supporting role combinations with case normalization. |
+
+---
+
+## 📜 Git Commit History (25 Commits)
 
 ```
+38bffd2 test(auth): add automated RBAC and authentication integration tests
+6b55ecb feat(routes): mount auth and role-protected test routes in Express app
+9f287b6 feat(controllers): implement authentication controller endpoints
+ab3180d feat(middlewares): implement verifyToken and RBAC authorization middlewares
+f0d0c8b feat(auth): implement authentication service with role security
+efdf521 feat(validators): create Zod schemas for registration and login validation
+55d9e4b feat(auth): implement JWT token generation and verification service
+d96973f feat(models): create Mongoose user model compatible with BetterAuth
+49c1a75 feat(auth): configure BetterAuth with MongoDB adapter and user schema
+65f7f20 docs: update server readme with architecture, endpoints, and usage guide
 ea7f6d9 test(smoke): add automated health check and verification script
 47c739d feat(server): implement server entry point with graceful shutdown
 df7f5c8 feat(app): assemble express application with complete middleware pipeline
