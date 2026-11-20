@@ -93,6 +93,9 @@ npm run test:booking
 
 # Run automated customer favorites, role isolation, & analytics aggregation test suite (27 assertions)
 npm run test:analytics
+
+# Run automated admin user directory & role management test suite (15 assertions)
+npm run test:users
 ```
 
 ---
@@ -239,3 +242,14 @@ npm run test:analytics
   - **`GET /api/owner/analytics/monthly-earnings`** — Historical monthly earnings strictly isolated to authenticated owner.
     - Query parameter: `months` (default: 6, max: 24).
     - Aggregates by month (`YYYY-MM`) and fills zero-earning months with `{ month, earnings: 0, rentalsCount: 0 }`.
+
+### 11. Admin User Management APIs (`/api/admin/users`)
+*Requires `Admin` role (`verifyAdmin`).*
+- **`GET /api/admin/users`** — Paginated user directory with multi-field search and role filtering.
+  - Query parameters:
+    - `search`: Case-insensitive regex match against user `name` and `email`.
+    - `role`: Filter by role (`customer`, `owner`, `admin`, `all`).
+    - `page` (default: 1), `limit` (default: 20).
+  - Prohibits exposing password hashes, salts, or sensitive auth tokens.
+- **`PATCH /api/admin/users/:id/role`** — Update a user's role (`customer`, `owner`, `admin`).
+  - Self-demotion guard: strictly prevents administrators from removing their own admin privileges.
