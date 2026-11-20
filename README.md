@@ -87,6 +87,9 @@ npm run test:auth
 
 # Run automated equipment management & upload test suite (26 assertions)
 npm run test:equipment
+
+# Run automated booking availability, pricing, & Stripe webhook test suite (21 assertions)
+npm run test:booking
 ```
 
 ---
@@ -167,3 +170,41 @@ npm run test:equipment
   - Validates MIME types (JPEG, PNG, WEBP, GIF) and 5MB file size limit.
   - Keeps binary data in memory buffers; binaries are never stored in MongoDB.
   - Returns: `{ url, displayUrl, deleteUrl, thumbnail }`.
+
+### 7. Rental Bookings APIs (`/api/bookings`, `/api/owner/bookings`, `/api/admin/bookings`)
+- **`GET /api/equipment/:id/availability`** — Public/Customer equipment availability lookup.
+  - Query parameters: `startDate`, `endDate`, `quantity` (optional, default: 1).
+  - Evaluates active rentals and 30-minute pending Stripe checkout reservations against `totalQuantity`.
+  - Returns: `{ isAvailable, availableQuantity, requestedQuantity, totalQuantity, activeBookingsCount }`.
+- **`POST /api/bookings`** — Customer equipment booking creation & Stripe checkout initialization.
+  - *Requires authentication with `Customer` role (`verifyRenter`).*
+  - Body: `{ equipmentId, startDate, endDate, quantity, contactNumber, deliveryAddress, additionalNotes? }`.
+  - Server-side duration and pricing calculations (`Daily`: days, `Weekly`: ceil(days/7), `Monthly`: ceil(days/30)).
+  - Rejects overlapping bookings that exceed `totalQuantity`.
+  - Initiates Stripe Checkout Session and returns: `{ booking, checkoutUrl, sessionId }`.
+- **`GET /api/bookings/my-rentals`** — Customer rental history.
+  - *Requires `Customer` role.*
+  - Query filters: `bookingStatus`, `paymentStatus`, pagination (`page`, `limit`).
+  - Returns populated equipment, owner contact details, and payment summary.
+- **`GET /api/bookings/:id`** — Single rental booking details.
+  - Accessible to the customer who booked, the equipment owner, or an administrator.
+- **`POST /api/bookings/:id/checkout`** — Reinitiate Stripe Checkout Session.
+  - *Requires `Customer` role.*
+  - Validates booking is `Pending` payment and regenerates a fresh Stripe Checkout Session.
+- **`GET /api/owner/bookings`** — Owner bookings and fleet rental management.
+  - *Requires `Owner` role (`verifyOwner`).*
+  - Returns all bookings for equipment owned by the authenticated owner.
+  - Supports filters: `equipmentId`, `bookingStatus`, `paymentStatus`, pagination.
+- **`GET /api/admin/bookings`** — Platform-wide booking oversight console.
+  - *Requires `Admin` role (`verifyAdmin`).*
+  - View all platform bookings across all customers and owners.
+- **`PATCH /api/admin/bookings/:id/status`** — Admin booking status override.
+  - *Requires `Admin` role (`verifyAdmin`).*
+  - Body: `{ bookingStatus?, paymentStatus? }`.
+
+### 8. Payments & Stripe Webhook (`/api/payments`)
+- **`POST /api/payments/webhook`** — Stripe Webhook receiver.
+  - Validates `stripe-signature` header against raw request byte buffer (`req.rawBody`).
+  - Idempotent processing: verifies if `Payment` record with `stripeSessionId` already exists before applying mutations.
+  - Handles `checkout.session.completed`: updates booking `paymentStatus: "Paid"`, `bookingStatus: "Confirmed"`, creates persistent `Payment` ledger entry.
+  - Handles `checkout.session.expired`: unlocks temporary inventory hold by updating booking `bookingStatus: "Cancelled"`, `paymentStatus: "Failed"`.
