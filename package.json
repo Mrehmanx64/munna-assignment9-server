@@ -11,7 +11,8 @@
     "test:smoke": "node smoke-test.cjs",
     "test:auth": "node test-auth.cjs",
     "test:equipment": "node test-equipment.cjs",
-    "test:booking": "node test-booking.cjs"
+    "test:booking": "node test-booking.cjs",
+    "test:analytics": "node test-milestone6.cjs"
   },
   "repository": {
     "type": "git",
