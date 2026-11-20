@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test:smoke": "node smoke-test.cjs",
     "test:auth": "node test-auth.cjs",
-    "test:equipment": "node test-equipment.cjs"
+    "test:equipment": "node test-equipment.cjs",
+    "test:booking": "node test-booking.cjs"
   },
   "repository": {
     "type": "git",
