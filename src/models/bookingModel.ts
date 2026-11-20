@@ -133,7 +133,9 @@ bookingSchema.index({
 
 bookingSchema.index({ customer: 1, createdAt: -1 });
 bookingSchema.index({ owner: 1, createdAt: -1 });
+bookingSchema.index({ owner: 1, bookingStatus: 1 });
 bookingSchema.index({ bookingStatus: 1, paymentStatus: 1, createdAt: -1 });
+bookingSchema.index({ createdAt: -1 });
 
 export const Booking: Model<IBooking> =
   mongoose.models.Booking ||

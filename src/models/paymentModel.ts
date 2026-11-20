@@ -85,6 +85,8 @@ const paymentSchema = new Schema<IPayment>(
 
 paymentSchema.index({ customer: 1, createdAt: -1 });
 paymentSchema.index({ owner: 1, createdAt: -1 });
+paymentSchema.index({ paymentStatus: 1, transactionDate: -1 });
+paymentSchema.index({ owner: 1, paymentStatus: 1, transactionDate: -1 });
 
 export const Payment: Model<IPayment> =
   mongoose.models.Payment ||
