@@ -120,6 +120,28 @@ export const verifyAdmin = (req: Request, res: Response, next: NextFunction): vo
 };
 
 /**
+ * Strict Customer Role Middleware: verifyStrictCustomer
+ * Confines access exclusively to Customers/Renters (disallows Owner and Admin)
+ */
+export const verifyStrictCustomer = (req: Request, res: Response, next: NextFunction): void => {
+  const checkRole = () => {
+    const role = (req.user?.role || "").toLowerCase();
+    if (role !== "customer" && role !== "renter") {
+      return next(
+        ApiError.forbidden("Access denied: Only Customer role can access this resource.")
+      );
+    }
+    next();
+  };
+
+  if (!req.user) {
+    return verifyToken(req, res, checkRole);
+  }
+
+  checkRole();
+};
+
+/**
  * Optional Auth Middleware
  * Attempts to extract and verify token if present; does not throw if absent
  */

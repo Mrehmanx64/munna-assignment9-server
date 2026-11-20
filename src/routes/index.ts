@@ -10,6 +10,7 @@ import { bookingRoutes } from "./bookingRoutes";
 import { ownerBookingRoutes } from "./ownerBookingRoutes";
 import { adminBookingRoutes } from "./adminBookingRoutes";
 import { paymentRoutes } from "./paymentRoutes";
+import { favoriteRoutes } from "./favoriteRoutes";
 import { getAuth } from "../config/auth";
 import { ResponseFormatter } from "../utils/ApiResponse";
 
@@ -32,6 +33,7 @@ router.get("/", (_req: Request, res: Response) => {
       "owner-bookings",
       "admin-bookings",
       "payments",
+      "favorites",
     ],
   });
 });
@@ -65,6 +67,9 @@ router.use("/admin/bookings", adminBookingRoutes);
 
 // Payment & Stripe Webhooks: /api/payments/*
 router.use("/payments", paymentRoutes);
+
+// Customer Favorites: /api/favorites/*
+router.use("/favorites", favoriteRoutes);
 
 // Direct BetterAuth node adapter endpoints: /api/better-auth/*
 router.use("/better-auth", (req: Request, res: Response, next: NextFunction) => {
