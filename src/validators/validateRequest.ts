@@ -11,12 +11,23 @@ export const validateRequest = (schema: RequestValidationSchema): RequestHandler
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
       if (schema.params) {
-        req.params = (await schema.params.parseAsync(req.params)) as Record<string, string>;
+        const parsedParams = await schema.params.parseAsync(req.params);
+        Object.defineProperty(req, "params", {
+          value: parsedParams,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
       }
 
       if (schema.query) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        req.query = (await schema.query.parseAsync(req.query)) as any;
+        const parsedQuery = await schema.query.parseAsync(req.query);
+        Object.defineProperty(req, "query", {
+          value: parsedQuery,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
       }
 
       if (schema.body) {

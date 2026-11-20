@@ -20,9 +20,10 @@ export class ImgBBService {
     buffer: Buffer,
     fileName = "equipment-photo"
   ): Promise<ImgBBUploadResult> {
+    const isTest = process.env.NODE_ENV === "test" || env.NODE_ENV === "test";
     if (!env.IMGBB_API_KEY || env.IMGBB_API_KEY === "placeholder_imgbb_key") {
       // In development or test without valid live ImgBB key, provide clear operational error or simulation
-      if (env.NODE_ENV === "test") {
+      if (isTest) {
         return {
           url: `https://i.ibb.co/test/${Date.now()}-${fileName}.jpg`,
           displayUrl: `https://i.ibb.co/test/${Date.now()}-${fileName}.jpg`,
@@ -45,8 +46,9 @@ export class ImgBBService {
     base64Data: string,
     name = "equipment-photo"
   ): Promise<ImgBBUploadResult> {
+    const isTest = process.env.NODE_ENV === "test" || env.NODE_ENV === "test";
     if (!env.IMGBB_API_KEY || env.IMGBB_API_KEY === "placeholder_imgbb_key") {
-      if (env.NODE_ENV === "test") {
+      if (isTest) {
         return {
           url: `https://i.ibb.co/test/${Date.now()}-${name}.jpg`,
           displayUrl: `https://i.ibb.co/test/${Date.now()}-${name}.jpg`,

@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test:smoke": "node smoke-test.cjs",
-    "test:auth": "node test-auth.cjs"
+    "test:auth": "node test-auth.cjs",
+    "test:equipment": "node test-equipment.cjs"
   },
   "repository": {
     "type": "git",
