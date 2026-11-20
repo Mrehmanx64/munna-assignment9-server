@@ -26,8 +26,15 @@ export const createApp = (): Express => {
   // 4. Rate Limiting for general API traffic
   app.use("/api", apiLimiter);
 
-  // 5. Body Parsers & Cookie Parser
-  app.use(express.json({ limit: "10mb" }));
+  // 5. Body Parsers & Cookie Parser (Captures rawBody for Stripe Webhook signature verification)
+  app.use(
+    express.json({
+      limit: "10mb",
+      verify: (req: any, _res: Response, buf: Buffer) => {
+        req.rawBody = buf;
+      },
+    })
+  );
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
   app.use(cookieParser());
 

@@ -28,6 +28,15 @@ const envSchema = z.object({
     .default("rentora_default_better_auth_secret_key_32_chars"),
   BETTER_AUTH_URL: z.string().default("http://localhost:5000"),
   STRIPE_SECRET_KEY: z.string().default("sk_test_placeholder"),
+  STRIPE_WEBHOOK_SECRET: z.string().default("whsec_placeholder"),
+  STRIPE_SUCCESS_URL: z
+    .string()
+    .default(
+      "http://localhost:3000/dashboard/customer/rentals?status=success&session_id={CHECKOUT_SESSION_ID}"
+    ),
+  STRIPE_CANCEL_URL: z
+    .string()
+    .default("http://localhost:3000/equipment?status=cancelled"),
   IMGBB_API_KEY: z.string().default("placeholder_imgbb_key"),
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
