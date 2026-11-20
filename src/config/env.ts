@@ -29,6 +29,8 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.string().default("http://localhost:5000"),
   STRIPE_SECRET_KEY: z.string().default("sk_test_placeholder"),
   IMGBB_API_KEY: z.string().default("placeholder_imgbb_key"),
+  GOOGLE_CLIENT_ID: z.string().optional().default(""),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
 });
 
 const parseEnv = () => {
