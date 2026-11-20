@@ -11,12 +11,12 @@ The server follows a clean, decoupled layer architecture:
 ```
 src/
   ├── config/             # Environment, CORS, BetterAuth, and MongoDB database configuration
-  ├── controllers/        # Request handlers (health, auth)
-  ├── middlewares/        # Centralized error handler, 404 handler, Helmet, rate limiting, verifyToken, RBAC
-  ├── models/             # Mongoose schemas & domain models (User)
-  ├── routes/             # Express API routers (health, auth, better-auth)
-  ├── services/           # Business logic layer (jwtService, authService)
-  ├── types/              # Standardized API response, error, and domain interfaces
+  ├── controllers/        # Request handlers (health, auth, equipment, owner, admin, upload)
+  ├── middlewares/        # Centralized error handler, 404 handler, Helmet, rate limiting, verifyToken, RBAC, upload
+  ├── models/             # Mongoose schemas & domain models (User, Equipment)
+  ├── routes/             # Express API routers (health, auth, equipment, owner, admin, uploads, better-auth)
+  ├── services/           # Business logic layer (jwtService, authService, equipmentService, imgbbService)
+  ├── types/              # Standardized API response, error, domain, and equipment interfaces
   ├── utils/              # ApiError, ResponseFormatter, asyncHandler wrappers
   ├── validators/         # Reusable Zod validation middleware and schemas
   ├── app.ts              # Express application factory & middleware pipeline
@@ -32,6 +32,7 @@ src/
 - **Database**: MongoDB via Mongoose (`v9.12.2`)
 - **Authentication**: BetterAuth (`v1.7.27`) + MongoDB Adapter, JWT (`jsonwebtoken v9.0.3`), bcryptjs (`v3.0.3`)
 - **Validation**: Zod (`v4.6.7`)
+- **File Upload & Hosting**: Multer (`v1.4.5-lts.1` memory storage), ImgBB API
 - **Security**: Helmet (`v8.3.0`), CORS (`v2.8.6`), express-rate-limit (`v8.7.5`)
 - **Utilities**: cookie-parser, dotenv
 - **Development Tooling**: tsx, typescript, eslint, prettier
@@ -81,8 +82,11 @@ npm run start
 # Run automated smoke test
 npm run test:smoke
 
-# Run automated authentication & RBAC test suite
+# Run automated authentication & RBAC test suite (19 assertions)
 npm run test:auth
+
+# Run automated equipment management & upload test suite (26 assertions)
+npm run test:equipment
 ```
 
 ---
@@ -90,7 +94,7 @@ npm run test:auth
 ## 🩺 Endpoints
 
 ### 1. Root & Health Check
-- **`GET /`** — Service status and metadata
+- **`GET /`** — Service status and registered modules list
 - **`GET /api/health`** — Server telemetry, uptime, memory, and database status
 
 ### 2. Authentication & Authorization (`/api/auth`)
@@ -98,64 +102,68 @@ npm run test:auth
   - Body: `{ name, email, password, confirmPassword?, role?, phone?, address?, avatarUrl? }`
   - Enforces role sanitization (disallows client self-assignment of `admin`; defaults to `customer`).
   - Sets HTTP-only `accessToken` cookie and returns `{ user, token }`.
-- **`POST /api/auth/login`** — Login with email and password.
+- **`POST /api/auth/login`** — Sign in with email/password.
   - Body: `{ email, password }`
-  - Validates credentials against BetterAuth account collection.
-  - Sets HTTP-only `accessToken` cookie and returns `{ user, token }`.
-- **`POST /api/auth/google`** — Google OAuth sign-in / registration.
-  - Body: `{ idToken?, email, name?, avatarUrl? }`
-  - **Guaranteed: New Google registrations strictly default to `Customer` (`customer`) role**.
-  - Returns `{ user, token }`.
-- **`GET /api/auth/me`** — Current authenticated user profile.
-  - Header: `Authorization: Bearer <token>` or cookie `accessToken`.
-  - Enables persistent session across page reloads.
-- **`POST /api/auth/logout`** — Clears authentication cookie and session.
+  - Validates credentials and sets HTTP-only `accessToken` cookie.
+- **`POST /api/auth/google`** — Google OAuth exchange.
+  - Body: `{ email, name, googleId?, avatarUrl? }`
+  - Strictly defaults role to `customer` for newly created Google users.
+- **`GET /api/auth/me`** — Session persistence across page reloads.
+  - Protected by `verifyToken` (reads Bearer header or HTTP-only cookie).
+  - Returns authenticated user profile.
+- **`POST /api/auth/logout`** — Clears authentication cookie and invalidates session.
+- **`GET /api/auth/test/protected`** — Verification endpoint for any authenticated token.
+- **`GET /api/auth/test/renter`** — Protected by `verifyRenter` (Renter/Customer & Admin).
+- **`GET /api/auth/test/owner`** — Protected by `verifyOwner` (Owner & Admin).
+- **`GET /api/auth/test/admin`** — Protected by `verifyAdmin` (Admin only).
 
-### 3. Role-Based Access Control (RBAC) Verification Endpoints
-- **`GET /api/auth/test/protected`** — Accessible by any verified user (`verifyToken`).
-- **`GET /api/auth/test/renter`** — Accessible by `Customer` (Renter) and `Admin` (`verifyRenter`).
-- **`GET /api/auth/test/owner`** — Accessible by `Owner` and `Admin` (`verifyOwner`).
-- **`GET /api/auth/test/admin`** — Exclusively accessible by `Admin` (`verifyAdmin`).
+### 3. Public Equipment APIs (`/api/equipment`)
+- **`GET /api/equipment`** — Get all approved equipment listings with server-side search, filtering, and pagination.
+  - Query parameters:
+    - `search` / `q`: multi-field search (title, name, brand, model, description, location)
+    - `category`: case-insensitive category filter
+    - `location`: location regex filter
+    - `rentalType`: `Daily`, `Weekly`, `Monthly`
+    - `minPrice`, `maxPrice`: numeric price bounds
+    - `available`: `true` (availableQuantity > 0)
+    - `sort`: `price_asc`, `price_desc`, `newest`, `rating`
+    - `page` (default: 1), `limit` (default: 12)
+  - Returns: `{ success: true, data: IEquipment[], meta: { total, page, limit, totalPages } }`
+- **`GET /api/equipment/featured`** — Get top featured equipment (hard-capped at 6 via MongoDB `.limit(6)`).
+- **`GET /api/equipment/categories`** — Aggregate summary of available approved listings by category.
+- **`GET /api/equipment/:id`** — Get equipment details by ID with populated owner contact info.
+  - Non-approved listings return 404 unless requested by the equipment owner or an administrator.
 
----
+### 4. Owner Equipment APIs (`/api/owner/equipment`)
+*Requires authentication with `Owner` role.*
+- **`POST /api/owner/equipment`** — Create a new equipment listing.
+  - Ownership is bound strictly to `req.user.id`.
+  - Approval status is forced to `Pending`.
+  - Body validated via Zod (`createEquipmentSchema`).
+- **`GET /api/owner/equipment`** — Get all equipment listings owned by the authenticated owner.
+  - Supports query filters: `status`, `category`, `search`, pagination.
+- **`GET /api/owner/equipment/:id`** — Get single equipment owned by current owner.
+  - Rejects access with 403 Forbidden if the equipment belongs to another owner.
+- **`PUT /api/owner/equipment/:id`** & **`PATCH /:id`** — Update own equipment listing.
+  - Prohibits altering owner or self-approving listing.
+- **`DELETE /api/owner/equipment/:id`** — Delete own equipment listing.
 
-## 🛡️ Required Express Middlewares
+### 5. Admin Equipment APIs (`/api/admin/equipment`)
+*Requires authentication with `Admin` role.*
+- **`GET /api/admin/equipment`** — Get all equipment across all statuses (`Pending`, `Approved`, `Rejected`).
+  - Supports `status`, `category`, `search`, and pagination.
+- **`PATCH /api/admin/equipment/:id/approve`** — Approve equipment listing.
+  - Sets `status: "Approved"`, `approvedAt: new Date()`, `approvedBy: adminId`.
+- **`PATCH /api/admin/equipment/:id/reject`** — Reject equipment listing.
+  - Body: `{ rejectionReason: string }` (mandatory explanation).
+  - Sets `status: "Rejected"`, `rejectionReason`, `rejectedAt: new Date()`, `rejectedBy: adminId`.
+- **`PUT /api/admin/equipment/:id`** — Update any equipment listing as administrator.
+- **`DELETE /api/admin/equipment/:id`** — Permanently delete any equipment listing.
 
-| Middleware | Description |
-|---|---|
-| `verifyToken` | Validates JWT from `Authorization: Bearer` header or HTTP-only cookie, attaching `req.user`. |
-| `verifyRenter` | Enforces Customer / Renter permissions (permits `customer`, `renter`, and `admin`). |
-| `verifyOwner` | Enforces Equipment Owner permissions (permits `owner` and `admin`). |
-| `verifyAdmin` | Enforces Platform Administrator permissions exclusively (`admin`). |
-| `authorizeRoles(...roles)` | Generic role checker supporting role combinations with case normalization. |
-
----
-
-## 📜 Git Commit History (25 Commits)
-
-```
-38bffd2 test(auth): add automated RBAC and authentication integration tests
-6b55ecb feat(routes): mount auth and role-protected test routes in Express app
-9f287b6 feat(controllers): implement authentication controller endpoints
-ab3180d feat(middlewares): implement verifyToken and RBAC authorization middlewares
-f0d0c8b feat(auth): implement authentication service with role security
-efdf521 feat(validators): create Zod schemas for registration and login validation
-55d9e4b feat(auth): implement JWT token generation and verification service
-d96973f feat(models): create Mongoose user model compatible with BetterAuth
-49c1a75 feat(auth): configure BetterAuth with MongoDB adapter and user schema
-65f7f20 docs: update server readme with architecture, endpoints, and usage guide
-ea7f6d9 test(smoke): add automated health check and verification script
-47c739d feat(server): implement server entry point with graceful shutdown
-df7f5c8 feat(app): assemble express application with complete middleware pipeline
-9b44ede feat(routes): implement health-check controller and route
-d1e5a37 feat(validators): create reusable zod request validation middleware
-2949e42 feat(database): implement resilient mongodb connection with mongoose
-5760c62 feat(middlewares): add helmet and rate limiting security middleware
-87cdf23 feat(config): configure cors policies for client integration
-8382574 feat(middlewares): implement centralized error handling and not-found middleware
-2b0f299 feat(utils): implement standard API response and custom error classes
-b503f16 feat(types): define standardized API response and error contracts
-fa98d31 feat(config): implement validated environment configuration with zod
-68edaac chore: configure development tooling and environment ignore rules
-9a6af31 first commit
-```
+### 6. File & Image Uploads (`/api/uploads`)
+*Requires authentication.*
+- **`POST /api/uploads/image`** (or **`POST /api/uploads`**) — Upload equipment photography to ImgBB.
+  - Accepts multipart form-data (field `image`) or JSON `{ image: "<base64_data>", name?: string }`.
+  - Validates MIME types (JPEG, PNG, WEBP, GIF) and 5MB file size limit.
+  - Keeps binary data in memory buffers; binaries are never stored in MongoDB.
+  - Returns: `{ url, displayUrl, deleteUrl, thumbnail }`.
