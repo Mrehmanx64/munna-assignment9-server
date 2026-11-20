@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test:smoke": "node smoke-test.cjs"
+    "test:smoke": "node smoke-test.cjs",
+    "test:auth": "node test-auth.cjs"
   },
   "repository": {
     "type": "git",

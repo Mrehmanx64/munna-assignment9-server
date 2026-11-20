@@ -23,7 +23,7 @@ router.use("/health", healthRoutes);
 router.use("/auth", authRoutes);
 
 // Direct BetterAuth node adapter endpoints: /api/better-auth/*
-router.all("/better-auth/*", (req: Request, res: Response, next: NextFunction) => {
+router.use("/better-auth", (req: Request, res: Response, next: NextFunction) => {
   try {
     const handler = toNodeHandler(getAuth());
     return handler(req, res);
