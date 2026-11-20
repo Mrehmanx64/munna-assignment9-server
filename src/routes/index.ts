@@ -6,6 +6,10 @@ import { equipmentRoutes } from "./equipmentRoutes";
 import { ownerEquipmentRoutes } from "./ownerEquipmentRoutes";
 import { adminEquipmentRoutes } from "./adminEquipmentRoutes";
 import { uploadRoutes } from "./uploadRoutes";
+import { bookingRoutes } from "./bookingRoutes";
+import { ownerBookingRoutes } from "./ownerBookingRoutes";
+import { adminBookingRoutes } from "./adminBookingRoutes";
+import { paymentRoutes } from "./paymentRoutes";
 import { getAuth } from "../config/auth";
 import { ResponseFormatter } from "../utils/ApiResponse";
 
@@ -24,6 +28,10 @@ router.get("/", (_req: Request, res: Response) => {
       "owner-equipment",
       "admin-equipment",
       "uploads",
+      "bookings",
+      "owner-bookings",
+      "admin-bookings",
+      "payments",
     ],
   });
 });
@@ -45,6 +53,18 @@ router.use("/admin/equipment", adminEquipmentRoutes);
 
 // File & Image uploads (ImgBB): /api/uploads/*
 router.use("/uploads", uploadRoutes);
+
+// Customer Bookings: /api/bookings/*
+router.use("/bookings", bookingRoutes);
+
+// Owner Booking overview: /api/owner/bookings/*
+router.use("/owner/bookings", ownerBookingRoutes);
+
+// Admin Booking management: /api/admin/bookings/*
+router.use("/admin/bookings", adminBookingRoutes);
+
+// Payment & Stripe Webhooks: /api/payments/*
+router.use("/payments", paymentRoutes);
 
 // Direct BetterAuth node adapter endpoints: /api/better-auth/*
 router.use("/better-auth", (req: Request, res: Response, next: NextFunction) => {
