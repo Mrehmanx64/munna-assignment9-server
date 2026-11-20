@@ -118,3 +118,38 @@ export const verifyAdmin = (req: Request, res: Response, next: NextFunction): vo
 
   next();
 };
+
+/**
+ * Optional Auth Middleware
+ * Attempts to extract and verify token if present; does not throw if absent
+ */
+export const optionalAuth = (req: Request, _res: Response, next: NextFunction): void => {
+  let token: string | undefined;
+
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1]?.trim();
+  }
+
+  if (!token && req.cookies) {
+    token = req.cookies.accessToken || req.cookies.token;
+  }
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = JwtService.verifyAccessToken(token);
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      name: decoded.name,
+    };
+  } catch {
+    // Ignore invalid token for optional auth
+  }
+
+  next();
+};
