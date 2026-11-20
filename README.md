@@ -90,6 +90,9 @@ npm run test:equipment
 
 # Run automated booking availability, pricing, & Stripe webhook test suite (21 assertions)
 npm run test:booking
+
+# Run automated customer favorites, role isolation, & analytics aggregation test suite (27 assertions)
+npm run test:analytics
 ```
 
 ---
@@ -208,3 +211,31 @@ npm run test:booking
   - Idempotent processing: verifies if `Payment` record with `stripeSessionId` already exists before applying mutations.
   - Handles `checkout.session.completed`: updates booking `paymentStatus: "Paid"`, `bookingStatus: "Confirmed"`, creates persistent `Payment` ledger entry.
   - Handles `checkout.session.expired`: unlocks temporary inventory hold by updating booking `bookingStatus: "Cancelled"`, `paymentStatus: "Failed"`.
+
+### 9. Customer Favorites APIs (`/api/favorites`)
+*Requires authentication with strict `Customer` role (`verifyStrictCustomer`).*
+- **`POST /api/favorites/:equipmentId`** — Add equipment listing to customer's favorites.
+  - Only approved equipment listings can be favorited (pending/rejected items are rejected).
+  - Idempotent: returns existing record cleanly if already favorited.
+- **`GET /api/favorites`** — List authenticated customer's saved favorites.
+  - Populates equipment data and query pagination (`page`, `limit`).
+  - Gracefully handles and filters out any deleted equipment without breaking client rendering.
+- **`DELETE /api/favorites/:equipmentId`** — Remove equipment from customer's favorites.
+  - Idempotent removal bound strictly to `req.user.id`.
+- **`GET /api/favorites/:equipmentId/status`** — Check favorite status.
+  - Returns: `{ isFavorite: boolean }`.
+
+### 10. Dashboard Analytics APIs (`/api/admin/analytics`, `/api/owner/analytics`)
+- **Admin Analytics** (*Requires `Admin` role — `verifyAdmin`*):
+  - **`GET /api/admin/analytics/overview`** — Platform-wide system totals:
+    - Returns: `totalUsers`, `totalEquipment`, `totalBookings`, `pendingApprovals`, `approvedEquipment`, `completedRentals`, `activeRentals`, `totalRevenue`.
+    - Revenue is strictly calculated from verified `Paid` payment records with zero duplicate counting.
+  - **`GET /api/admin/analytics/monthly-bookings`** — Historical monthly booking & revenue trajectory.
+    - Query parameter: `months` (default: 6, max: 24).
+    - Aggregates by month (`YYYY-MM`) and guarantees zero-booking months are represented in chronological order.
+- **Owner Analytics** (*Requires `Owner` role — `verifyOwner`*):
+  - **`GET /api/owner/analytics/overview`** — Fleet overview strictly isolated to `req.user.id`:
+    - Returns: `totalEquipment`, `activeListings`, `pendingListings`, `totalBookings`, `completedRentals`, `activeRentals`, `pendingRentals`, `totalEarnings`.
+  - **`GET /api/owner/analytics/monthly-earnings`** — Historical monthly earnings strictly isolated to authenticated owner.
+    - Query parameter: `months` (default: 6, max: 24).
+    - Aggregates by month (`YYYY-MM`) and fills zero-earning months with `{ month, earnings: 0, rentalsCount: 0 }`.
