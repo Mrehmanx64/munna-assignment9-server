@@ -13,6 +13,7 @@ import { paymentRoutes } from "./paymentRoutes";
 import { favoriteRoutes } from "./favoriteRoutes";
 import { adminAnalyticsRoutes } from "./adminAnalyticsRoutes";
 import { ownerAnalyticsRoutes } from "./ownerAnalyticsRoutes";
+import { adminUserRoutes } from "./adminUserRoutes";
 import { getAuth } from "../config/auth";
 import { ResponseFormatter } from "../utils/ApiResponse";
 
@@ -38,6 +39,7 @@ router.get("/", (_req: Request, res: Response) => {
       "favorites",
       "admin-analytics",
       "owner-analytics",
+      "admin-users",
     ],
   });
 });
@@ -80,6 +82,9 @@ router.use("/admin/analytics", adminAnalyticsRoutes);
 
 // Owner Dashboard Analytics: /api/owner/analytics/*
 router.use("/owner/analytics", ownerAnalyticsRoutes);
+
+// Admin User Directory & Role Management: /api/admin/users/*
+router.use("/admin/users", adminUserRoutes);
 
 // Direct BetterAuth node adapter endpoints: /api/better-auth/*
 router.use("/better-auth", (req: Request, res: Response, next: NextFunction) => {
