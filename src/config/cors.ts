@@ -13,8 +13,8 @@ const devOrigins: string[] = [
   "http://127.0.0.1:3000",
 ];
 
-// Project-specific preview pattern (strictly restricted to rentora-* deployments, not arbitrary vercel apps)
-const projectPreviewPattern = /^https:\/\/rentora(?:-[a-zA-Z0-9_-]+)?\.vercel\.app$/;
+// Project-specific preview pattern (strictly restricted to rentora and munna-assignment9-client deployments)
+const projectPreviewPattern = /^https:\/\/(?:rentora|munna-assignment9-client)(?:-[a-zA-Z0-9_-]+)?\.vercel\.app$/;
 
 export const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
