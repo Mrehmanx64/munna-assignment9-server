@@ -44,17 +44,18 @@ const baseEnvSchema = z.object({
 
 const envSchema = baseEnvSchema.superRefine((data, ctx) => {
   if (data.NODE_ENV === "production") {
-    // 1. Stripe Live Keys Verification: Must use live Stripe credentials in production
+    // 1. Stripe Keys Verification: Must use valid live or test credentials in production (no placeholders)
     if (
       !data.STRIPE_SECRET_KEY ||
       data.STRIPE_SECRET_KEY.includes("placeholder") ||
-      !data.STRIPE_SECRET_KEY.startsWith("sk_live_")
+      (!data.STRIPE_SECRET_KEY.startsWith("sk_live_") &&
+        !data.STRIPE_SECRET_KEY.startsWith("sk_test_"))
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["STRIPE_SECRET_KEY"],
         message:
-          "In production, STRIPE_SECRET_KEY must be a valid live Stripe secret key starting with 'sk_live_'. Test keys ('sk_test_') and placeholders are strictly prohibited.",
+          "In production, STRIPE_SECRET_KEY must be a valid Stripe secret key starting with 'sk_live_' (for live payments) or 'sk_test_' (for initial deployment testing). Placeholders are strictly prohibited.",
       });
     }
 

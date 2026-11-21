@@ -19,10 +19,17 @@ export class StripeService {
     equipmentTitle: string,
     customerEmail: string
   ): Promise<{ sessionId: string; checkoutUrl: string }> {
-    // In production, fallback to mock is strictly prohibited
+    // In production, fallback to mock is strictly prohibited; valid live or test keys required
     if (env.NODE_ENV === "production") {
-      if (!env.STRIPE_SECRET_KEY || !env.STRIPE_SECRET_KEY.startsWith("sk_live_")) {
-        throw ApiError.internal("Live Stripe configuration is required in production environment");
+      if (
+        !env.STRIPE_SECRET_KEY ||
+        env.STRIPE_SECRET_KEY.includes("placeholder") ||
+        (!env.STRIPE_SECRET_KEY.startsWith("sk_live_") &&
+          !env.STRIPE_SECRET_KEY.startsWith("sk_test_"))
+      ) {
+        throw ApiError.internal(
+          "Valid Stripe configuration (sk_live_ or sk_test_) is required in production environment"
+        );
       }
     }
 
