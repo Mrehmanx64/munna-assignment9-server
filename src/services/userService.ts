@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { User, IUser, UserRole } from "../models/userModel";
 import { AdminUserQueryInput } from "../validators/userValidators";
 import { ApiError } from "../utils/ApiError";
+import { escapeRegex } from "../utils/sanitize";
 
 export class UserService {
   /**
@@ -31,7 +32,7 @@ export class UserService {
 
     // 2. Search filter (name or email)
     if (query.search && query.search.trim()) {
-      const term = query.search.trim();
+      const term = escapeRegex(query.search.trim());
       filter.$or = [
         { name: { $regex: term, $options: "i" } },
         { email: { $regex: term, $options: "i" } },

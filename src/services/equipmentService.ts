@@ -7,6 +7,7 @@ import {
   EquipmentQueryInput,
 } from "../validators/equipmentValidators";
 import { ApiError } from "../utils/ApiError";
+import { escapeRegex } from "../utils/sanitize";
 
 export class EquipmentService {
   /**
@@ -63,11 +64,11 @@ export class EquipmentService {
     }
 
     if (query.category) {
-      filter.category = { $regex: new RegExp(`^${query.category.trim()}$`, "i") };
+      filter.category = { $regex: new RegExp(`^${escapeRegex(query.category.trim())}$`, "i") };
     }
 
     if (query.search || query.q) {
-      const term = (query.search || query.q || "").trim();
+      const term = escapeRegex((query.search || query.q || "").trim());
       filter.$or = [
         { name: { $regex: term, $options: "i" } },
         { title: { $regex: term, $options: "i" } },
@@ -207,7 +208,7 @@ export class EquipmentService {
 
     // Search query (across name, title, brand, model, description, location)
     if (query.search || query.q) {
-      const term = (query.search || query.q || "").trim();
+      const term = escapeRegex((query.search || query.q || "").trim());
       filter.$or = [
         { name: { $regex: term, $options: "i" } },
         { title: { $regex: term, $options: "i" } },
@@ -220,12 +221,12 @@ export class EquipmentService {
 
     // Category filter (case-insensitive exact match)
     if (query.category) {
-      filter.category = { $regex: new RegExp(`^${query.category.trim()}$`, "i") };
+      filter.category = { $regex: new RegExp(`^${escapeRegex(query.category.trim())}$`, "i") };
     }
 
     // Location filter
     if (query.location) {
-      filter.location = { $regex: query.location.trim(), $options: "i" };
+      filter.location = { $regex: escapeRegex(query.location.trim()), $options: "i" };
     }
 
     // Rental Type filter (Daily, Weekly, Monthly)
@@ -376,11 +377,11 @@ export class EquipmentService {
     }
 
     if (query.category) {
-      filter.category = { $regex: new RegExp(`^${query.category.trim()}$`, "i") };
+      filter.category = { $regex: new RegExp(`^${escapeRegex(query.category.trim())}$`, "i") };
     }
 
     if (query.search || query.q) {
-      const term = (query.search || query.q || "").trim();
+      const term = escapeRegex((query.search || query.q || "").trim());
       filter.$or = [
         { name: { $regex: term, $options: "i" } },
         { title: { $regex: term, $options: "i" } },

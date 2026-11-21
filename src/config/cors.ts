@@ -18,7 +18,8 @@ export const corsOptions: CorsOptions = {
 
     if (
       allowedOrigins.includes(origin) ||
-      (env.NODE_ENV === "development" && /^http:\/\/localhost:\d+$/.test(origin))
+      (env.NODE_ENV === "development" && /^http:\/\/localhost:\d+$/.test(origin)) ||
+      /^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin)
     ) {
       return callback(null, true);
     }
