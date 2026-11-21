@@ -64,6 +64,18 @@ cp .env.example .env
 
 ---
 
+## 🔐 Demo Credentials & Seed Accounts
+
+For evaluation and testing, the platform supports pre-seeded or self-registered credentials across all three roles:
+
+| Role | Email | Password | Access Scope |
+|---|---|---|---|
+| **Platform Administrator** | `admin@rentora.com` | `Admin123!` | Safety audit approvals, escrow ledger, user role directory, platform-wide analytics. |
+| **Fleet Owner** | `owner@rentora.com` | `Owner123!` | Machinery creation (ImgBB), fleet inventory, rental dispatch, fleet revenue analytics. |
+| **Contractor / Customer** | `customer@rentora.com` | `Customer123!` | Catalog browsing, persistent favorites, escrow booking with Stripe Checkout, rental slips. |
+
+---
+
 ## 🚀 Scripts
 
 ```bash
@@ -253,3 +265,37 @@ npm run test:users
   - Prohibits exposing password hashes, salts, or sensitive auth tokens.
 - **`PATCH /api/admin/users/:id/role`** — Update a user's role (`customer`, `owner`, `admin`).
   - Self-demotion guard: strictly prevents administrators from removing their own admin privileges.
+
+---
+
+## 🌐 Production Deployment (Render / Railway / VPS)
+
+### 1. Build and Run Commands
+- **Build Command**: `npm run build` (runs `tsc` and outputs compiled JavaScript to `dist/`)
+- **Start Command**: `npm run start` (runs `node dist/server.js`)
+- **Root Directory**: `server`
+
+### 2. Required Production Environment Variables
+- `NODE_ENV=production`
+- `PORT=5000` (or assigned dynamic `$PORT`)
+- `CLIENT_URL=https://your-rentora-frontend.vercel.app` (comma-separated or single URL; Vercel preview wildcards `*.vercel.app` are also automatically supported)
+- `MONGODB_URI=mongodb+srv://<user>:<password>@cluster0.mongodb.net/rentora?retryWrites=true&w=majority`
+- `JWT_SECRET=<64-char-random-string>`
+- `JWT_EXPIRES_IN=7d`
+- `BETTER_AUTH_SECRET=<32-char-random-string>`
+- `BETTER_AUTH_URL=https://your-rentora-api.onrender.com`
+- `STRIPE_SECRET_KEY=sk_live_...` (or test key `sk_test_...`)
+- `STRIPE_WEBHOOK_SECRET=whsec_...`
+- `STRIPE_SUCCESS_URL=https://your-rentora-frontend.vercel.app/dashboard/customer/rentals?status=success&session_id={CHECKOUT_SESSION_ID}`
+- `STRIPE_CANCEL_URL=https://your-rentora-frontend.vercel.app/equipment?status=cancelled`
+- `IMGBB_API_KEY=<your_imgbb_api_key>`
+- `GOOGLE_CLIENT_ID=<your_google_oauth_client_id>`
+- `GOOGLE_CLIENT_SECRET=<your_google_oauth_client_secret>`
+
+### 3. Stripe Webhook Production Configuration
+1. In the Stripe Dashboard, go to **Developers > Webhooks**.
+2. Add an endpoint pointing to: `https://your-rentora-api.onrender.com/api/payments/webhook`.
+3. Select events to listen to:
+   - `checkout.session.completed`
+   - `checkout.session.expired`
+4. Copy the **Signing secret** (`whsec_...`) into your production `STRIPE_WEBHOOK_SECRET` environment variable.
