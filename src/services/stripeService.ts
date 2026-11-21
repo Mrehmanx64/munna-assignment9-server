@@ -86,7 +86,9 @@ export class StripeService {
           duration: String(booking.duration),
           rentalType: booking.rentalType,
         },
-        success_url: successUrl,
+        success_url: successUrl.includes("booking_id")
+          ? successUrl
+          : `${successUrl}${successUrl.includes("?") ? "&" : "?"}booking_id=${bookingId}`,
         cancel_url: env.STRIPE_CANCEL_URL,
       });
 
@@ -243,6 +245,82 @@ export class StripeService {
       booking.paymentStatus = "Failed";
       booking.bookingStatus = "Cancelled";
       await booking.save();
+    }
+  }
+
+  /**
+   * Verify a Stripe Checkout Session by ID and sync booking/payment state
+   */
+  public static async verifyCheckoutSession(
+    sessionId: string
+  ): Promise<{ booking: IBooking | null; payment: IPayment | null }> {
+    if (!sessionId) {
+      throw ApiError.badRequest("Session ID is required");
+    }
+
+    // 1. Idempotency Check: if payment with this session ID already exists, return early
+    const existingPayment = await Payment.findOne({ stripeSessionId: sessionId });
+    if (existingPayment) {
+      const existingBooking = await Booking.findById(existingPayment.booking);
+      if (existingBooking && existingBooking.paymentStatus !== "Paid") {
+        existingBooking.paymentStatus = "Paid";
+        existingBooking.bookingStatus = "Confirmed";
+        await existingBooking.save();
+      }
+      return {
+        booking: existingBooking ? (existingBooking.toJSON() as IBooking) : null,
+        payment: existingPayment.toJSON() as IPayment,
+      };
+    }
+
+    // 2. In mock or test environment without live Stripe keys
+    const isMock =
+      env.NODE_ENV !== "production" &&
+      (process.env.NODE_ENV === "test" ||
+        env.NODE_ENV === "test" ||
+        !env.STRIPE_SECRET_KEY ||
+        env.STRIPE_SECRET_KEY.includes("placeholder") ||
+        env.STRIPE_SECRET_KEY.length < 30);
+
+    if (isMock || sessionId.startsWith("cs_mock_")) {
+      const booking = await Booking.findOne({
+        $or: [{ stripeSessionId: sessionId }, { _id: sessionId }],
+      });
+      if (booking) {
+        booking.paymentStatus = "Paid";
+        booking.bookingStatus = "Confirmed";
+        await booking.save();
+        return { booking: booking.toJSON() as IBooking, payment: null };
+      }
+      return { booking: null, payment: null };
+    }
+
+    // 3. Query Stripe directly to retrieve the session and reconcile state
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (!session) {
+        throw ApiError.notFound("Stripe Checkout Session not found");
+      }
+
+      if (session.payment_status === "paid" || session.status === "complete") {
+        return await this.handleCheckoutSessionCompleted(session);
+      }
+
+      const bookingId = session.metadata?.bookingId || session.client_reference_id;
+      const booking = bookingId ? await Booking.findById(bookingId) : null;
+      return {
+        booking: booking ? (booking.toJSON() as IBooking) : null,
+        payment: null,
+      };
+    } catch (err: any) {
+      const fallbackBooking = await Booking.findOne({ stripeSessionId: sessionId });
+      if (fallbackBooking) {
+        return {
+          booking: fallbackBooking.toJSON() as IBooking,
+          payment: null,
+        };
+      }
+      throw ApiError.badRequest(`Failed to verify Stripe session: ${err.message}`);
     }
   }
 }

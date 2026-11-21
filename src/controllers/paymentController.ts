@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { StripeService } from "../services/stripeService";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiError } from "../utils/ApiError";
+import { ResponseFormatter } from "../utils/ApiResponse";
 import Stripe from "stripe";
 
 export class PaymentController {
@@ -37,5 +38,23 @@ export class PaymentController {
     }
 
     res.status(200).json({ received: true });
+  });
+
+  /**
+   * GET /api/payments/verify/:sessionId
+   * Verify a Stripe Checkout Session and reconcile booking/payment records
+   */
+  public static verifySession = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const sessionId = Array.isArray(req.params.sessionId)
+      ? req.params.sessionId[0]
+      : req.params.sessionId;
+
+    if (!sessionId) {
+      throw ApiError.badRequest("Session ID is required");
+    }
+
+    const result = await StripeService.verifyCheckoutSession(sessionId);
+
+    ResponseFormatter.ok(res, "Payment session verified and booking confirmed", result);
   });
 }
