@@ -79,6 +79,68 @@ In development, developers can register accounts or test role endpoints using te
 
 ---
 
+## 🛡️ First Platform Administrator Provisioning
+
+To securely bootstrap the platform's initial administrator without hardcoded passwords or public endpoints:
+
+### Execution Command
+```bash
+# Option A: Supply via environment variables (recommended for automated deployments)
+BOOTSTRAP_ADMIN_NAME="Platform Administrator" \
+BOOTSTRAP_ADMIN_EMAIL="admin@rentora.com" \
+BOOTSTRAP_ADMIN_PASSWORD="YourSecurePassword2026!" \
+npm run bootstrap:admin
+
+# Option B: Interactive CLI mode (will securely prompt for name, email, and password)
+npm run bootstrap:admin
+
+# Option C: In production Docker/Node container
+npm run bootstrap:admin:prod
+```
+
+### Security Safeguards
+1. **Single-Execution Lock**: The script queries `User.findOne({ role: "admin" })` upon boot. If any administrator already exists, it aborts immediately with an exit code 1 to prevent unauthorized overwrites.
+2. **Bcrypt Work Factor 10**: Passwords are cryptographically hashed using `bcrypt` and stored in the BetterAuth `account` collection.
+3. **Zero Secrets in Logs**: Passwords and secrets are never printed to `stdout` or logs.
+4. **Offline CLI Only**: No public HTTP endpoint exists for administrator creation.
+
+### Recovery Procedure
+If administrator credentials are lost or need emergency rotation:
+1. Connect directly to your MongoDB production cluster via mongosh or Atlas console.
+2. Identify the administrator's document in the `user` collection: `db.user.findOne({ role: "admin" })`.
+3. To reset the password, generate a bcrypt hash using `bcryptjs` and update the matching record in `account`:
+   ```javascript
+   db.account.updateOne(
+     { userId: "<adminUserId>", providerId: "credential" },
+     { $set: { password: "<newBcryptHash>", updatedAt: new Date() } }
+   );
+   ```
+4. Or, if resetting completely, remove the orphaned admin record from `user` and `account`, and rerun `npm run bootstrap:admin`.
+
+---
+
+## 🍪 Production JWT Architecture & Cookie Settings
+
+Rentora utilizes a stateless, dual-delivery JWT architecture:
+
+1. **Storage Mechanism**:
+   - **No `localStorage` Persistence**: The frontend client strictly avoids storing JWT tokens in `localStorage` or `sessionStorage` to eliminate Cross-Site Scripting (XSS) token exfiltration vulnerabilities.
+   - **In-Memory Non-Persistent State**: An in-memory token holder (`inMemoryAccessToken`) is kept in active JavaScript memory for the life of the page turn only.
+   - **HTTP-Only, Secure Cookies**: Persistent sessions across page reloads and browser restarts are managed entirely via the `accessToken` cookie.
+2. **Cookie Flags**:
+   - `httpOnly: true` — Inaccessible to client-side scripts (`document.cookie`).
+   - `secure: true` in production — Transmitted only over encrypted TLS/HTTPS.
+   - `sameSite`:
+     - Cross-domain deployment (e.g. Vercel frontend + Render API): `sameSite: "none"` with `secure: true`.
+     - Same-domain deployment (e.g. `app.rentora.com` + `api.rentora.com` or reverse proxy): `sameSite: "lax"`.
+   - `maxAge: 7 * 24 * 60 * 60 * 1000` (7 days lifespan).
+3. **Recommended Production Topologies**:
+   - **Option A (Reverse Proxy / Same-Domain)**: Configure Next.js rewrites in `next.config.ts` or an Nginx/Cloudflare reverse proxy mapping `https://rentora.com/api/*` to the backend Express server. This guarantees first-party cookie handling (`SameSite=Lax`), eliminating third-party cookie restrictions entirely.
+   - **Option B (Custom Domains)**: Place frontend on `rentora.com` and backend on `api.rentora.com`. Set cookie domain to `.rentora.com` for unified first-party context.
+   - **Option C (Cross-Origin Default)**: Frontend on `*.vercel.app` and backend on `*.onrender.com` with `SameSite=None; Secure; Partitioned` and `credentials: true`.
+
+---
+
 ## 🚀 Scripts
 
 ```bash
@@ -94,7 +156,10 @@ npm run build
 # Start production server
 npm run start
 
-# Run automated smoke test
+# Provision initial platform administrator
+npm run bootstrap:admin
+
+# Run automated smoke test (3 assertions)
 npm run test:smoke
 
 # Run automated authentication & RBAC test suite (19 assertions)
@@ -111,6 +176,9 @@ npm run test:analytics
 
 # Run automated admin user directory & role management test suite (15 assertions)
 npm run test:users
+
+# Run automated admin bootstrap verification test suite (4 assertions)
+npm run test:bootstrap
 ```
 
 ---

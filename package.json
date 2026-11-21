@@ -8,12 +8,15 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "bootstrap:admin": "tsx src/scripts/bootstrapAdmin.ts",
+    "bootstrap:admin:prod": "node dist/scripts/bootstrapAdmin.js",
     "test:smoke": "node smoke-test.cjs",
     "test:auth": "node test-auth.cjs",
     "test:equipment": "node test-equipment.cjs",
     "test:booking": "node test-booking.cjs",
     "test:analytics": "node test-milestone6.cjs",
-    "test:users": "node test-admin-users.cjs"
+    "test:users": "node test-admin-users.cjs",
+    "test:bootstrap": "node test-bootstrap-admin.cjs"
   },
   "repository": {
     "type": "git",
