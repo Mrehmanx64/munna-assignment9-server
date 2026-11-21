@@ -226,7 +226,7 @@ export class BookingService {
 
     // Create Stripe Checkout Session
     const checkoutSession = await StripeService.createCheckoutSession(
-      savedBooking.toJSON() as IBooking,
+      savedBooking as unknown as IBooking,
       equipment.name || equipment.title,
       customerEmail
     );
@@ -271,7 +271,7 @@ export class BookingService {
     }
 
     const checkoutSession = await StripeService.createCheckoutSession(
-      booking.toJSON() as IBooking,
+      booking as unknown as IBooking,
       equipment.name || equipment.title,
       customerEmail
     );

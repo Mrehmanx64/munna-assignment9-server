@@ -56,10 +56,15 @@ export class StripeService {
         "{CHECKOUT_SESSION_ID}"
       );
 
+      const bookingId = (booking._id || (booking as any).id)?.toString() || "";
+      const customerId = (booking.customer?._id || booking.customer)?.toString() || "";
+      const ownerId = (booking.owner?._id || booking.owner)?.toString() || "";
+      const equipmentId = (booking.equipment?._id || booking.equipment)?.toString() || "";
+
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: customerEmail,
-        client_reference_id: booking._id.toString(),
+        client_reference_id: bookingId,
         line_items: [
           {
             price_data: {
@@ -74,10 +79,10 @@ export class StripeService {
           },
         ],
         metadata: {
-          bookingId: booking._id.toString(),
-          customerId: booking.customer.toString(),
-          ownerId: booking.owner.toString(),
-          equipmentId: booking.equipment.toString(),
+          bookingId,
+          customerId,
+          ownerId,
+          equipmentId,
           duration: String(booking.duration),
           rentalType: booking.rentalType,
         },
