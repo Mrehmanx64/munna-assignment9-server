@@ -60,19 +60,22 @@ cp .env.example .env
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID (optional in dev) | `your_google_client_id...` |
 | `GOOGLE_CLIENT_SECRET`| Google OAuth Client Secret (optional in dev)| `your_google_client_secret...` |
 | `STRIPE_SECRET_KEY` | Stripe API secret key | `sk_test_placeholder` |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | `whsec_placeholder` |
+| `STRIPE_SUCCESS_URL`| Stripe checkout success redirect URL | `http://localhost:3000/dashboard/customer/rentals?status=success&session_id={CHECKOUT_SESSION_ID}` |
+| `STRIPE_CANCEL_URL` | Stripe checkout cancellation redirect URL | `http://localhost:3000/equipment?status=cancelled` |
 | `IMGBB_API_KEY` | imgbb image hosting API key | `placeholder_imgbb_key` |
 
 ---
 
-## 🔐 Demo Credentials & Seed Accounts
+## 🔐 Role Access & Authentication Model
 
-For evaluation and testing, the platform supports pre-seeded or self-registered credentials across all three roles:
+Rentora implements strict role-based access control (RBAC) across three distinct tiers:
 
-| Role | Email | Password | Access Scope |
-|---|---|---|---|
-| **Platform Administrator** | `admin@rentora.com` | `Admin123!` | Safety audit approvals, escrow ledger, user role directory, platform-wide analytics. |
-| **Fleet Owner** | `owner@rentora.com` | `Owner123!` | Machinery creation (ImgBB), fleet inventory, rental dispatch, fleet revenue analytics. |
-| **Contractor / Customer** | `customer@rentora.com` | `Customer123!` | Catalog browsing, persistent favorites, escrow booking with Stripe Checkout, rental slips. |
+- **Customer / Renter**: Default role assigned upon registration and Google OAuth sign-in. Access to public equipment, booking creation, personal favorites, and rental history.
+- **Fleet Owner**: Access to owner equipment CRUD, fleet availability, rental dispatch, and fleet earnings analytics.
+- **Platform Administrator**: Universal supervisory clearance. Access to equipment approvals/rejections with mandatory audit trails, master escrow ledger, user directory management, and platform analytics.
+
+In development, developers can register accounts or test role endpoints using test fixtures. In production, default credentials and automatic demo accounts are prohibited; administrator privileges must be initialized through controlled administrative provisioning.
 
 ---
 

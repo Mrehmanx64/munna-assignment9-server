@@ -4,7 +4,7 @@ import { z } from "zod";
 // Load environment variables from .env file
 dotenv.config();
 
-const envSchema = z.object({
+const baseEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
@@ -40,6 +40,84 @@ const envSchema = z.object({
   IMGBB_API_KEY: z.string().default("placeholder_imgbb_key"),
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
+});
+
+const envSchema = baseEnvSchema.superRefine((data, ctx) => {
+  if (data.NODE_ENV === "production") {
+    // 1. Stripe Live Keys Verification: Must use live Stripe credentials in production
+    if (
+      !data.STRIPE_SECRET_KEY ||
+      data.STRIPE_SECRET_KEY.includes("placeholder") ||
+      !data.STRIPE_SECRET_KEY.startsWith("sk_live_")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["STRIPE_SECRET_KEY"],
+        message:
+          "In production, STRIPE_SECRET_KEY must be a valid live Stripe secret key starting with 'sk_live_'. Test keys ('sk_test_') and placeholders are strictly prohibited.",
+      });
+    }
+
+    if (
+      !data.STRIPE_WEBHOOK_SECRET ||
+      data.STRIPE_WEBHOOK_SECRET.includes("placeholder") ||
+      !data.STRIPE_WEBHOOK_SECRET.startsWith("whsec_")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["STRIPE_WEBHOOK_SECRET"],
+        message:
+          "In production, STRIPE_WEBHOOK_SECRET must be a valid Stripe webhook secret starting with 'whsec_'. Placeholders are strictly prohibited.",
+      });
+    }
+
+    // 2. JWT and Security Secrets Verification
+    if (
+      !data.JWT_SECRET ||
+      data.JWT_SECRET === "rentora_default_development_jwt_secret_key_32_chars" ||
+      data.JWT_SECRET.length < 32
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["JWT_SECRET"],
+        message:
+          "In production, JWT_SECRET must be a custom secret at least 32 characters long.",
+      });
+    }
+
+    if (
+      !data.BETTER_AUTH_SECRET ||
+      data.BETTER_AUTH_SECRET === "rentora_default_better_auth_secret_key_32_chars" ||
+      data.BETTER_AUTH_SECRET.length < 32
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["BETTER_AUTH_SECRET"],
+        message:
+          "In production, BETTER_AUTH_SECRET must be a custom secret at least 32 characters long.",
+      });
+    }
+
+    // 3. ImgBB API Key Verification
+    if (!data.IMGBB_API_KEY || data.IMGBB_API_KEY === "placeholder_imgbb_key") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["IMGBB_API_KEY"],
+        message:
+          "In production, IMGBB_API_KEY must be a valid live ImgBB API key.",
+      });
+    }
+
+    // 4. Client URL Verification
+    if (!data.CLIENT_URL || data.CLIENT_URL.includes("localhost")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["CLIENT_URL"],
+        message:
+          "In production, CLIENT_URL must point to a live production domain (e.g. https://rentora-marketplace.vercel.app), not localhost.",
+      });
+    }
+  }
 });
 
 const parseEnv = () => {

@@ -19,12 +19,20 @@ export class StripeService {
     equipmentTitle: string,
     customerEmail: string
   ): Promise<{ sessionId: string; checkoutUrl: string }> {
+    // In production, fallback to mock is strictly prohibited
+    if (env.NODE_ENV === "production") {
+      if (!env.STRIPE_SECRET_KEY || !env.STRIPE_SECRET_KEY.startsWith("sk_live_")) {
+        throw ApiError.internal("Live Stripe configuration is required in production environment");
+      }
+    }
+
     const isMock =
-      process.env.NODE_ENV === "test" ||
-      env.NODE_ENV === "test" ||
-      !env.STRIPE_SECRET_KEY ||
-      env.STRIPE_SECRET_KEY.includes("placeholder") ||
-      env.STRIPE_SECRET_KEY.length < 30;
+      env.NODE_ENV !== "production" &&
+      (process.env.NODE_ENV === "test" ||
+        env.NODE_ENV === "test" ||
+        !env.STRIPE_SECRET_KEY ||
+        env.STRIPE_SECRET_KEY.includes("placeholder") ||
+        env.STRIPE_SECRET_KEY.length < 30);
 
     if (isMock) {
       const mockSessionId = `cs_test_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -88,6 +96,25 @@ export class StripeService {
     rawBody: Buffer | string,
     signature: string
   ): Stripe.Event {
+    // In production, live webhook signature verification is mandatory
+    if (env.NODE_ENV === "production") {
+      if (!signature) {
+        throw ApiError.badRequest("Stripe-Signature header is required");
+      }
+      if (!env.STRIPE_WEBHOOK_SECRET || !env.STRIPE_WEBHOOK_SECRET.startsWith("whsec_")) {
+        throw ApiError.internal("Live Stripe webhook secret is not configured in production");
+      }
+      try {
+        return stripe.webhooks.constructEvent(
+          rawBody,
+          signature,
+          env.STRIPE_WEBHOOK_SECRET
+        );
+      } catch (err: any) {
+        throw ApiError.badRequest(`Stripe Webhook Signature Verification Failed: ${err.message}`);
+      }
+    }
+
     const isMock =
       process.env.NODE_ENV === "test" ||
       env.NODE_ENV === "test" ||

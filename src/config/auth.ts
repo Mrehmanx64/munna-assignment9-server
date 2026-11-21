@@ -34,12 +34,15 @@ export const createBetterAuth = () => {
     database: mongodbAdapter(db),
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
-    trustedOrigins: [
-      env.CLIENT_URL,
-      "http://localhost:3000",
-      "http://localhost:5173",
-      "http://127.0.0.1:3000",
-    ],
+    trustedOrigins:
+      env.NODE_ENV === "production"
+        ? (env.CLIENT_URL ? env.CLIENT_URL.split(",").map((s) => s.trim()).filter(Boolean) : [])
+        : [
+            env.CLIENT_URL,
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:3000",
+          ],
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,

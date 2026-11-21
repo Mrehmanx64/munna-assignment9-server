@@ -1,26 +1,42 @@
 import { CorsOptions } from "cors";
 import { env } from "./env";
 
-// Allowed origins in development and production
-const allowedOrigins: string[] = [
-  env.CLIENT_URL,
+// Parse configured client origins (supports comma-separated origins)
+const configuredOrigins: string[] = env.CLIENT_URL
+  ? env.CLIENT_URL.split(",").map((url) => url.trim()).filter(Boolean)
+  : [];
+
+// Development-only local origins
+const devOrigins: string[] = [
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:3000",
 ];
 
+// Project-specific preview pattern (strictly restricted to rentora-* deployments, not arbitrary vercel apps)
+const projectPreviewPattern = /^https:\/\/rentora(?:-[a-zA-Z0-9_-]+)?\.vercel\.app$/;
+
 export const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    // Allow server-to-server or tools without origin header (e.g. Postman, curl)
+    // Allow server-to-server or tools without origin header (e.g. Postman, curl, health checks)
     if (!origin) {
       return callback(null, true);
     }
 
-    if (
-      allowedOrigins.includes(origin) ||
-      (env.NODE_ENV === "development" && /^http:\/\/localhost:\d+$/.test(origin)) ||
-      /^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin)
-    ) {
+    // 1. Explicitly configured origins (production or dev)
+    if (configuredOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // 2. Development mode: allow standard local development servers
+    if (env.NODE_ENV === "development" || env.NODE_ENV === "test") {
+      if (devOrigins.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin)) {
+        return callback(null, true);
+      }
+    }
+
+    // 3. Controlled preview domain matching: strictly restricted to rentora project domains
+    if (projectPreviewPattern.test(origin)) {
       return callback(null, true);
     }
 
