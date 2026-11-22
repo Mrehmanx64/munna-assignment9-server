@@ -23,7 +23,7 @@ export const registerSchema = z
       .enum(["customer", "owner", "renter"])
       .optional()
       .default("customer")
-      .transform(() => "customer" as const),
+      .transform((val) => (val === "owner" ? ("owner" as const) : ("customer" as const))),
     phone: z.string().trim().optional(),
     address: z.string().trim().optional(),
     avatarUrl: z.string().trim().url("Invalid avatar URL format").optional().or(z.literal("")),

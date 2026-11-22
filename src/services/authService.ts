@@ -32,9 +32,8 @@ export class AuthService {
       throw ApiError.conflict("An account with this email address already exists");
     }
 
-    // Role security: Public registration always defaults to "customer".
-    // Customer cannot register directly as Owner or Admin. Only Admin can promote.
-    const sanitizedRole: UserRole = "customer";
+    // Role security: Disallow self-assignment of "admin"; allow "customer" and "owner"
+    const sanitizedRole: UserRole = input.role === "owner" ? "owner" : "customer";
 
     const hashedPassword = await bcrypt.hash(input.password, 10);
 
