@@ -21,15 +21,15 @@ export class ImgBBService {
     fileName = "equipment-photo"
   ): Promise<ImgBBUploadResult> {
     const isTest = process.env.NODE_ENV === "test" || env.NODE_ENV === "test";
+    if (isTest) {
+      return {
+        url: `https://i.ibb.co/test/${Date.now()}-${fileName}.jpg`,
+        displayUrl: `https://i.ibb.co/test/${Date.now()}-${fileName}.jpg`,
+        deleteUrl: `https://ibb.co/delete/test`,
+      };
+    }
+
     if (!env.IMGBB_API_KEY || env.IMGBB_API_KEY === "placeholder_imgbb_key") {
-      // In development or test without valid live ImgBB key, provide clear operational error or simulation
-      if (isTest) {
-        return {
-          url: `https://i.ibb.co/test/${Date.now()}-${fileName}.jpg`,
-          displayUrl: `https://i.ibb.co/test/${Date.now()}-${fileName}.jpg`,
-          deleteUrl: `https://ibb.co/delete/test`,
-        };
-      }
       throw ApiError.badRequest(
         "ImgBB API key is not configured or is a placeholder. Please set a valid IMGBB_API_KEY in server/.env"
       );
@@ -47,14 +47,15 @@ export class ImgBBService {
     name = "equipment-photo"
   ): Promise<ImgBBUploadResult> {
     const isTest = process.env.NODE_ENV === "test" || env.NODE_ENV === "test";
+    if (isTest) {
+      return {
+        url: `https://i.ibb.co/test/${Date.now()}-${name}.jpg`,
+        displayUrl: `https://i.ibb.co/test/${Date.now()}-${name}.jpg`,
+        deleteUrl: `https://ibb.co/delete/test`,
+      };
+    }
+
     if (!env.IMGBB_API_KEY || env.IMGBB_API_KEY === "placeholder_imgbb_key") {
-      if (isTest) {
-        return {
-          url: `https://i.ibb.co/test/${Date.now()}-${name}.jpg`,
-          displayUrl: `https://i.ibb.co/test/${Date.now()}-${name}.jpg`,
-          deleteUrl: `https://ibb.co/delete/test`,
-        };
-      }
       throw ApiError.badRequest(
         "ImgBB API key is not configured or is a placeholder. Please set a valid IMGBB_API_KEY in server/.env"
       );
