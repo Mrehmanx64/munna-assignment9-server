@@ -12,7 +12,8 @@ export const securityHeaders = helmet({
 // General API rate limiter
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: env.NODE_ENV === "production" ? 100 : 1000, // Limit each IP
+  limit: env.NODE_ENV === "production" ? 1500 : 5000, // Generous quota for SPA browsing (100 req/min)
+  skip: (req) => req.method === "OPTIONS", // Never rate limit CORS preflight requests
   standardHeaders: "draft-8", // Return standard RateLimit headers
   legacyHeaders: false,
   statusCode: HttpStatus.TOO_MANY_REQUESTS,
@@ -28,7 +29,8 @@ export const apiLimiter = rateLimit({
 // Stricter rate limiter for sensitive endpoints (auth, password resets)
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: env.NODE_ENV === "production" ? 10 : 100,
+  limit: env.NODE_ENV === "production" ? 50 : 200,
+  skip: (req) => req.method === "OPTIONS",
   standardHeaders: "draft-8",
   legacyHeaders: false,
   statusCode: HttpStatus.TOO_MANY_REQUESTS,
