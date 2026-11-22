@@ -14,6 +14,7 @@ import { favoriteRoutes } from "./favoriteRoutes";
 import { adminAnalyticsRoutes } from "./adminAnalyticsRoutes";
 import { ownerAnalyticsRoutes } from "./ownerAnalyticsRoutes";
 import { adminUserRoutes } from "./adminUserRoutes";
+import { adminUpgradeRoutes } from "./adminUpgradeRoutes";
 import { userRoutes } from "./userRoutes";
 import { getAuth } from "../config/auth";
 import { ResponseFormatter } from "../utils/ApiResponse";
@@ -86,7 +87,9 @@ router.use("/owner/analytics", ownerAnalyticsRoutes);
 
 // Admin User Directory & Role Management: /api/admin/users/*
 router.use("/admin/users", adminUserRoutes);
-router.use("/admin/upgrade-requests", adminUserRoutes);
+
+// Admin Role Upgrade Requests Review: /api/admin/upgrade-requests/*
+router.use("/admin/upgrade-requests", adminUpgradeRoutes);
 
 // User profile endpoints: /api/users/*
 router.use("/users", userRoutes);
