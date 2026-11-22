@@ -87,8 +87,8 @@ To securely bootstrap the platform's initial administrator without hardcoded pas
 ```bash
 # Option A: Supply via environment variables (recommended for automated deployments)
 BOOTSTRAP_ADMIN_NAME="Platform Administrator" \
-BOOTSTRAP_ADMIN_EMAIL="admin@rentora.com" \
-BOOTSTRAP_ADMIN_PASSWORD="YourSecurePassword2026!" \
+BOOTSTRAP_ADMIN_EMAIL="admin@yourdomain.com" \
+BOOTSTRAP_ADMIN_PASSWORD="<STRONG_UNIQUE_PASSWORD_MIN_8_CHARS>" \
 npm run bootstrap:admin
 
 # Option B: Interactive CLI mode (will securely prompt for name, email, and password)

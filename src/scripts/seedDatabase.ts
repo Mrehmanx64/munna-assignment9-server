@@ -4,21 +4,37 @@ import { env } from "../config/env";
 import { User } from "../models/userModel";
 import { Equipment } from "../models/equipmentModel";
 
-const SEED_PASSWORD = "Password@1234";
-
 export const seedDatabase = async () => {
+  // 1. Strict Production Guard: Database seeding is forbidden in production
+  if (env.NODE_ENV === "production" || process.env.NODE_ENV === "production") {
+    console.error("❌ CRITICAL: Database seeding is strictly disabled in production environments.");
+    throw new Error("Database seeding is prohibited when NODE_ENV=production");
+  }
+
+  // 2. Require explicit development seed credentials via environment variables
+  const seedAdminEmail = process.env.SEED_ADMIN_EMAIL?.trim();
+  const seedAdminPassword = process.env.SEED_ADMIN_PASSWORD?.trim();
+  const seedOwnerEmail = process.env.SEED_OWNER_EMAIL?.trim();
+  const seedOwnerPassword = process.env.SEED_OWNER_PASSWORD?.trim();
+  const seedCustomerEmail = process.env.SEED_CUSTOMER_EMAIL?.trim();
+  const seedCustomerPassword = process.env.SEED_CUSTOMER_PASSWORD?.trim();
+
+  if (!seedAdminEmail || !seedAdminPassword) {
+    console.error("❌ Seeding Aborted: Explicit development seed credentials are required.");
+    console.error("   Please provide SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in development environment.");
+    throw new Error("Missing required seed credentials: SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be defined.");
+  }
+
   console.log("⏳ Connecting to MongoDB Atlas:", env.MONGODB_URI.replace(/:([^@]+)@/, ":****@"));
   await mongoose.connect(env.MONGODB_URI);
   const db = mongoose.connection.db;
   if (!db) throw new Error("Database not connected");
 
-  console.log("🔨 Hashing seed password...");
-  const hashedPassword = await bcrypt.hash(SEED_PASSWORD, 10);
-
-  // 1. Seed Users
+  // 3. Prepare users to seed using explicit environment variables only
   const usersToSeed: Array<{
     name: string;
     email: string;
+    password: string;
     role: "admin" | "customer" | "owner";
     avatarUrl: string;
     phone: string;
@@ -27,48 +43,68 @@ export const seedDatabase = async () => {
   }> = [
     {
       name: "Platform Administrator",
-      email: "admin@rentora.com",
+      email: seedAdminEmail,
+      password: seedAdminPassword,
       role: "admin",
       avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80",
       phone: "+1 (555) 901-2345",
       address: "Rentora HQ, 100 Pine Street, San Francisco, CA",
       emailVerified: true,
     },
-    {
+  ];
+
+  if (seedOwnerEmail && seedOwnerPassword) {
+    usersToSeed.push({
       name: "Marcus Vance",
-      email: "marcus@vanceheavygear.com",
+      email: seedOwnerEmail,
+      password: seedOwnerPassword,
       role: "owner",
       avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
       phone: "+1 (555) 876-5432",
       address: "1850 Industrial Parkway, Oakland, CA 94607",
       emailVerified: true,
-    },
-    {
+    });
+  }
+
+  if (seedCustomerEmail && seedCustomerPassword) {
+    usersToSeed.push({
       name: "Alexander Hayes",
-      email: "alexander.hayes@apexbuild.com",
+      email: seedCustomerEmail,
+      password: seedCustomerPassword,
       role: "customer",
       avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
       phone: "+1 (555) 234-5678",
       address: "742 Montgomery St, San Francisco, CA 94111",
       emailVerified: true,
-    },
-  ];
+    });
+  }
 
   const seededUsers: Record<string, any> = {};
 
   for (const u of usersToSeed) {
     let userDoc = await User.findOne({ email: u.email });
     if (!userDoc) {
-      userDoc = await User.create(u);
+      userDoc = await User.create({
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        avatarUrl: u.avatarUrl,
+        phone: u.phone,
+        address: u.address,
+        emailVerified: u.emailVerified,
+      });
       console.log(`✅ Created user: ${u.email} (${u.role})`);
     } else {
-      console.log(`ℹ️ User already exists: ${u.email}`);
+      console.log(`ℹ️ User already exists: ${u.email} — preserving existing role and security profile.`);
+      // Security: NEVER automatically promote existing accounts to Admin
+      // Security: NEVER overwrite existing user passwords
     }
     seededUsers[u.role] = userDoc;
 
-    // Ensure BetterAuth account entry exists with password
+    // Ensure BetterAuth account entry exists with password only if no account exists
     const existingAccount = await db.collection("account").findOne({ userId: userDoc._id.toString() });
     if (!existingAccount) {
+      const hashedPassword = await bcrypt.hash(u.password, 10);
       await db.collection("account").insertOne({
         userId: userDoc._id.toString(),
         accountId: userDoc.email,
@@ -78,6 +114,8 @@ export const seedDatabase = async () => {
         updatedAt: new Date(),
       });
       console.log(`  🔑 Created credential auth record for ${u.email}`);
+    } else {
+      console.log(`  🔒 Preserved existing authentication record for ${u.email}`);
     }
   }
 
