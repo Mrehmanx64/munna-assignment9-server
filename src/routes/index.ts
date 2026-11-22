@@ -86,6 +86,7 @@ router.use("/owner/analytics", ownerAnalyticsRoutes);
 
 // Admin User Directory & Role Management: /api/admin/users/*
 router.use("/admin/users", adminUserRoutes);
+router.use("/admin/upgrade-requests", adminUserRoutes);
 
 // User profile endpoints: /api/users/*
 router.use("/users", userRoutes);
