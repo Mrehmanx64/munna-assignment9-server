@@ -14,6 +14,7 @@ import { favoriteRoutes } from "./favoriteRoutes";
 import { adminAnalyticsRoutes } from "./adminAnalyticsRoutes";
 import { ownerAnalyticsRoutes } from "./ownerAnalyticsRoutes";
 import { adminUserRoutes } from "./adminUserRoutes";
+import { userRoutes } from "./userRoutes";
 import { getAuth } from "../config/auth";
 import { ResponseFormatter } from "../utils/ApiResponse";
 
@@ -85,6 +86,9 @@ router.use("/owner/analytics", ownerAnalyticsRoutes);
 
 // Admin User Directory & Role Management: /api/admin/users/*
 router.use("/admin/users", adminUserRoutes);
+
+// User profile endpoints: /api/users/*
+router.use("/users", userRoutes);
 
 // Direct BetterAuth node adapter endpoints: /api/better-auth/*
 router.use("/better-auth", (req: Request, res: Response, next: NextFunction) => {

@@ -101,4 +101,34 @@ export class UserService {
     const sanitized = user.toJSON() as Partial<IUser>;
     return sanitized;
   }
+
+  /**
+   * User: Update own profile
+   * Strictly permits only safe profile fields: name, phone, address, avatarUrl/image.
+   * Disallows modifying role, password hash, admin privileges, or account security fields.
+   */
+  public static async updateProfile(
+    userId: string,
+    data: { name?: string; phone?: string; address?: string; avatarUrl?: string; image?: string }
+  ): Promise<Partial<IUser>> {
+    const userObjectId = this.validateObjectId(userId, "User ID");
+    const user = await User.findById(userObjectId);
+    if (!user) {
+      throw ApiError.notFound("User not found");
+    }
+
+    if (data.name !== undefined && data.name.trim()) user.name = data.name.trim();
+    if (data.phone !== undefined) user.phone = data.phone.trim();
+    if (data.address !== undefined) user.address = data.address.trim();
+    if (data.avatarUrl !== undefined) {
+      user.avatarUrl = data.avatarUrl.trim();
+      user.image = data.avatarUrl.trim();
+    } else if (data.image !== undefined) {
+      user.image = data.image.trim();
+      user.avatarUrl = data.image.trim();
+    }
+
+    await user.save();
+    return user.toJSON() as Partial<IUser>;
+  }
 }
