@@ -218,7 +218,6 @@ equipmentSchema.index({ status: 1, category: 1, rentalPrice: 1 });
 equipmentSchema.index({ status: 1, featured: 1, createdAt: -1 });
 equipmentSchema.index({ owner: 1, createdAt: -1 });
 equipmentSchema.index({ owner: 1, status: 1 });
-equipmentSchema.index({ status: 1 });
 
 export const Equipment: Model<IEquipment> =
   mongoose.models.Equipment ||
