@@ -265,9 +265,27 @@ export class BookingService {
       throw ApiError.badRequest("This booking has already been paid for and confirmed");
     }
 
+    if (booking.bookingStatus === "Cancelled") {
+      throw ApiError.badRequest("This booking reservation has been cancelled. Please submit a new reservation.");
+    }
+
     const equipment = await Equipment.findById(booking.equipment);
     if (!equipment) {
       throw ApiError.notFound("Associated equipment no longer exists");
+    }
+
+    // Recheck stock availability prior to regenerating payment session
+    const availability = await this.checkEquipmentAvailability(
+      booking.equipment.toString(),
+      booking.startDate.toISOString(),
+      booking.endDate.toISOString(),
+      booking.quantity
+    );
+
+    if (!availability.isAvailable) {
+      throw ApiError.conflict(
+        `Equipment stock is no longer available for these rental dates (Available: ${availability.availableQuantity}, Required: ${booking.quantity}).`
+      );
     }
 
     const checkoutSession = await StripeService.createCheckoutSession(
@@ -480,6 +498,34 @@ export class BookingService {
     const booking = await Booking.findById(bookingObjectId);
     if (!booking) {
       throw ApiError.notFound("Booking not found");
+    }
+
+    booking.bookingStatus = newStatus;
+    const saved = await booking.save();
+    return saved.toJSON() as IBooking;
+  }
+
+  /**
+   * Owner: Update booking lifecycle status for own equipment rental
+   * Strictly verifies booking belongs to current owner.
+   * Allows allowed lifecycle actions: Confirmed, Active, Completed, Cancelled.
+   * Strictly disallows modifying payment status (payments are controlled solely via Stripe).
+   */
+  public static async updateOwnerBookingStatus(
+    ownerId: string,
+    bookingId: string,
+    newStatus: BookingStatus
+  ): Promise<IBooking> {
+    const bookingObjectId = this.validateObjectId(bookingId, "Booking");
+    const ownerObjectId = this.validateObjectId(ownerId, "Owner ID");
+
+    const booking = await Booking.findById(bookingObjectId);
+    if (!booking) {
+      throw ApiError.notFound("Booking not found");
+    }
+
+    if (booking.owner.toString() !== ownerObjectId.toString()) {
+      throw ApiError.forbidden("You are not authorized to update another owner's rental booking");
     }
 
     booking.bookingStatus = newStatus;

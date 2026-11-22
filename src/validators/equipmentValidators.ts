@@ -115,10 +115,12 @@ export const updateEquipmentSchema = z.object({
 });
 
 export const adminEquipmentStatusSchema = z.object({
-  status: z.enum(["Approved", "Rejected"]),
+  status: z.enum(["Approved", "Rejected"]).optional().default("Rejected"),
   rejectionReason: z.string().trim().optional(),
+  reason: z.string().trim().optional(),
 }).refine((data) => {
-  if (data.status === "Rejected" && (!data.rejectionReason || data.rejectionReason.trim().length === 0)) {
+  const reasonText = data.rejectionReason || data.reason;
+  if (data.status === "Rejected" && (!reasonText || reasonText.trim().length === 0)) {
     return false;
   }
   return true;

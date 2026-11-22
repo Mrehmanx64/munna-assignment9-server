@@ -166,6 +166,28 @@ export class EquipmentService {
       updateData.name = updateData.title;
     }
 
+    // Material change policy: If an approved listing's core details are modified, reset to Pending review
+    const materialFields = [
+      "name",
+      "title",
+      "description",
+      "category",
+      "rentalPrice",
+      "rentalType",
+      "condition",
+      "brand",
+      "model",
+      "imageUrl",
+      "images",
+      "rentalTerms",
+    ];
+    const isMateriallyModified = materialFields.some((f) => updateData[f] !== undefined);
+
+    if (equipment.status === "Approved" && isMateriallyModified) {
+      equipment.status = "Pending";
+      console.log(`ℹ️ Equipment ${equipment._id} reset to Pending status due to material modifications by owner.`);
+    }
+
     Object.assign(equipment, updateData);
     const updated = await equipment.save();
     return updated.toJSON() as IEquipment;
@@ -248,6 +270,8 @@ export class EquipmentService {
     // Availability filter
     if (query.available === true) {
       filter.availableQuantity = { $gt: 0 };
+    } else if (query.available === false) {
+      filter.availableQuantity = { $lte: 0 };
     }
 
     // Sorting
