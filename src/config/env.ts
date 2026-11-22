@@ -32,11 +32,11 @@ const baseEnvSchema = z.object({
   STRIPE_SUCCESS_URL: z
     .string()
     .default(
-      "http://localhost:3000/dashboard/customer/rentals?status=success&session_id={CHECKOUT_SESSION_ID}"
+      "http://localhost:3000/payment/success?session_id={CHECKOUT_SESSION_ID}"
     ),
   STRIPE_CANCEL_URL: z
     .string()
-    .default("http://localhost:3000/equipment?status=cancelled"),
+    .default("http://localhost:3000/payment/failed"),
   IMGBB_API_KEY: z.string().default("placeholder_imgbb_key"),
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),

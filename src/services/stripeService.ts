@@ -51,15 +51,36 @@ export class StripeService {
     }
 
     try {
-      const successUrl = env.STRIPE_SUCCESS_URL.replace(
-        "{CHECKOUT_SESSION_ID}",
-        "{CHECKOUT_SESSION_ID}"
-      );
-
       const bookingId = (booking._id || (booking as any).id)?.toString() || "";
       const customerId = (booking.customer?._id || booking.customer)?.toString() || "";
       const ownerId = (booking.owner?._id || booking.owner)?.toString() || "";
       const equipmentId = (booking.equipment?._id || booking.equipment)?.toString() || "";
+
+      // Ensure successUrl points to /payment/success
+      let successUrl = env.STRIPE_SUCCESS_URL;
+      if (successUrl.includes("/dashboard/customer")) {
+        successUrl = successUrl.replace(/\/dashboard\/customer(\/rentals)?/, "/payment/success");
+      }
+      if (!successUrl.includes("/payment/success")) {
+        const clientBase = (env.CLIENT_URL || "https://munna-assignment9-client.vercel.app").replace(/\/$/, "");
+        successUrl = `${clientBase}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
+      }
+      if (!successUrl.includes("session_id=")) {
+        successUrl = `${successUrl}${successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`;
+      }
+      if (!successUrl.includes("booking_id=")) {
+        successUrl = `${successUrl}${successUrl.includes("?") ? "&" : "?"}booking_id=${bookingId}`;
+      }
+
+      // Ensure cancelUrl points to /payment/failed
+      let cancelUrl = env.STRIPE_CANCEL_URL;
+      if (cancelUrl.includes("/equipment?status=cancelled") || !cancelUrl.includes("/payment/")) {
+        const clientBase = (env.CLIENT_URL || "https://munna-assignment9-client.vercel.app").replace(/\/$/, "");
+        cancelUrl = `${clientBase}/payment/failed`;
+      }
+      if (!cancelUrl.includes("booking_id=")) {
+        cancelUrl = `${cancelUrl}${cancelUrl.includes("?") ? "&" : "?"}booking_id=${bookingId}&status=cancelled`;
+      }
 
       // Align Stripe Checkout Session expiration strictly with 30-minute booking inventory hold
       const expiresAt = Math.floor(Date.now() / 1000) + 30 * 60; // 30 minutes in seconds
@@ -90,10 +111,8 @@ export class StripeService {
           duration: String(booking.duration),
           rentalType: booking.rentalType,
         },
-        success_url: successUrl.includes("booking_id")
-          ? successUrl
-          : `${successUrl}${successUrl.includes("?") ? "&" : "?"}booking_id=${bookingId}`,
-        cancel_url: env.STRIPE_CANCEL_URL,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
       });
 
       return {
