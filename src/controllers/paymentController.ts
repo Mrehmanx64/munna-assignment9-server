@@ -53,7 +53,10 @@ export class PaymentController {
       throw ApiError.badRequest("Session ID is required");
     }
 
-    const result = await StripeService.verifyCheckoutSession(sessionId);
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const result = await StripeService.verifyCheckoutSession(sessionId, userId, userRole);
 
     ResponseFormatter.ok(res, "Payment session verified and booking confirmed", result);
   });
