@@ -5,7 +5,10 @@ import { uploadSingleImage } from "../middlewares/uploadMiddleware";
 
 const router = Router();
 
-// Uploading equipment photos requires authentication
+// Public photo upload (supports registration avatar uploads without prior auth token)
+router.post("/avatar", uploadSingleImage, UploadController.upload);
+
+// Authenticated equipment photo uploads
 router.use(verifyToken);
 
 // Multipart form upload under field 'image' or JSON body with base64
