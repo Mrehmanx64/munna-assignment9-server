@@ -54,6 +54,11 @@ export const checkDatabaseHealth = (): DatabaseHealth => {
   const readyState = mongoose.connection.readyState;
   const status = connectionStatusMap[readyState] ?? "disconnected";
 
+  // In production, infrastructure details (host, database name) must never be leaked
+  if (env.NODE_ENV === "production") {
+    return { status };
+  }
+
   return {
     status,
     host: mongoose.connection.host || undefined,

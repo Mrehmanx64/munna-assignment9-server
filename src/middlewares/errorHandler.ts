@@ -76,6 +76,12 @@ export const errorHandler: ErrorRequestHandler = (
       statusCode = HttpStatus.UNAUTHORIZED;
       message = "Authorization token has expired";
     }
+    // CORS errors
+    else if (err instanceof Error && (err.message.includes("CORS") || err.message.includes("not allowed by CORS"))) {
+      statusCode = HttpStatus.FORBIDDEN;
+      message = "Cross-Origin request denied by security policy";
+      stack = err.stack;
+    }
     // Standard Javascript Error
     else if (err instanceof Error) {
       message = err.message || message;
@@ -83,9 +89,29 @@ export const errorHandler: ErrorRequestHandler = (
     }
   }
 
-  // Hide internal server error details in production
-  if (env.NODE_ENV === "production" && statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
-    message = "An unexpected error occurred on the server";
+  // Diagnostics: keep detailed stack and error traces strictly on the server console
+  if (statusCode >= 500) {
+    console.error(`[CRITICAL] Server Error ${statusCode}:`, err);
+  } else if (env.NODE_ENV === "development") {
+    console.warn(`[API] Client/Validation Error ${statusCode}:`, message);
+  }
+
+  // Strict Production Sanitization: Never leak filesystem paths, MongoDB internals, or secrets to clients
+  if (env.NODE_ENV === "production") {
+    stack = undefined; // Enforce zero stack traces in production responses
+
+    if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
+      message = "An unexpected error occurred on the server";
+    } else {
+      // Strip potential filesystem paths (Windows or Unix paths)
+      if (/[a-zA-Z]:\\[^"'\n]+|\/(?:home|var|usr|etc|app|node_modules)[^"'\n]*/.test(message)) {
+        message = "An unexpected error occurred";
+      }
+      // Strip Mongo topology/internals and secrets
+      if (/topology|mongoservererror|buffering timed out|password|secret|key|token/i.test(message)) {
+        message = "A service error occurred. Please try again.";
+      }
+    }
   }
 
   const response: ApiErrorResponse = {
