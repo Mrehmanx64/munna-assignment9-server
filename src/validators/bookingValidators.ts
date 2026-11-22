@@ -10,28 +10,31 @@ export const createBookingSchema = z
     endDate: z.string().datetime({ message: "End date must be a valid ISO date string" }).or(
       z.string().regex(/^\d{4}-\d{2}-\d{2}/, "End date must be in YYYY-MM-DD format")
     ),
-    quantity: z
+    quantity: z.coerce
       .number()
       .int("Quantity must be an integer")
-      .min(1, "Quantity must be at least 1"),
+      .min(1, "Quantity must be at least 1")
+      .default(1),
     contactNumber: z
       .string()
       .trim()
-      .min(7, "Contact number must be at least 7 characters"),
+      .min(3, "Contact number must be at least 3 characters")
+      .default("+1 (555) 234-5678"),
     deliveryAddress: z
       .string()
       .trim()
-      .min(5, "Delivery address must be at least 5 characters"),
+      .min(2, "Delivery address must be at least 2 characters")
+      .default("Jobsite Delivery Address"),
     additionalNotes: z.string().trim().optional(),
   })
   .refine(
     (data) => {
       const start = new Date(data.startDate);
       const end = new Date(data.endDate);
-      return !isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start;
+      return !isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start;
     },
     {
-      message: "End date must be strictly after the start date",
+      message: "End date must be on or after the start date",
       path: ["endDate"],
     }
   );
@@ -55,10 +58,10 @@ export const availabilityQuerySchema = z
     (data) => {
       const start = new Date(data.startDate);
       const end = new Date(data.endDate);
-      return !isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start;
+      return !isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start;
     },
     {
-      message: "End date must be strictly after the start date",
+      message: "End date must be on or after the start date",
       path: ["endDate"],
     }
   );

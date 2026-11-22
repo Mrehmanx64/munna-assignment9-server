@@ -54,12 +54,14 @@ export class BookingService {
     const start = new Date(startDateStr);
     const end = new Date(endDateStr);
 
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
-      throw ApiError.badRequest("Rental end date must be strictly after the start date");
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
+      throw ApiError.badRequest("Rental end date must be on or after the start date");
     }
 
     const diffMs = end.getTime() - start.getTime();
-    const totalDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    // Same-day rental (diffMs === 0) counts as 1 full day
+    const dayCount = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const totalDays = Math.max(1, dayCount === 0 ? 1 : dayCount);
 
     let duration: number;
     const rentalType = equipment.rentalType || "Daily";
@@ -106,8 +108,8 @@ export class BookingService {
     const start = new Date(startDateStr);
     const end = new Date(endDateStr);
 
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
-      throw ApiError.badRequest("Invalid rental date range: end date must be after start date");
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
+      throw ApiError.badRequest("Invalid rental date range: end date must be on or after start date");
     }
 
     const equipment = await Equipment.findById(eqObjectId);
@@ -124,9 +126,15 @@ export class BookingService {
     // Active checkout hold window: 30 minutes
     const holdCutoff = new Date(Date.now() - 30 * 60 * 1000);
 
+    // If start and end are same day, set effectiveEnd to end of that day for proper overlap query
+    const effectiveEnd =
+      end.getTime() === start.getTime()
+        ? new Date(end.getTime() + 24 * 60 * 60 * 1000 - 1)
+        : end;
+
     const overlapFilter: Record<string, any> = {
       equipment: eqObjectId,
-      startDate: { $lt: end },
+      startDate: { $lt: effectiveEnd },
       endDate: { $gt: start },
       $or: [
         { bookingStatus: { $in: ["Confirmed", "Active"] } },
