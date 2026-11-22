@@ -29,90 +29,169 @@ const specificationSchema = z.object({
   value: z.string().trim().min(1, "Specification value is required"),
 });
 
-export const createEquipmentSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Equipment name must be at least 2 characters")
-    .max(150, "Equipment name cannot exceed 150 characters")
-    .optional(),
-  title: z
-    .string()
-    .trim()
-    .min(2, "Equipment title must be at least 2 characters")
-    .max(150, "Equipment title cannot exceed 150 characters")
-    .optional(),
-  description: z
-    .string()
-    .trim()
-    .min(10, "Description must be at least 10 characters")
-    .max(3000, "Description cannot exceed 3000 characters"),
-  category: z
-    .string()
-    .trim()
-    .min(2, "Category must be at least 2 characters"),
-  location: z
-    .string()
-    .trim()
-    .min(2, "Location must be at least 2 characters"),
-  rentalPrice: z
-    .number()
-    .positive("Rental price must be greater than 0"),
-  rentalType: rentalTypeSchema.default("Daily"),
-  availableQuantity: z
-    .number()
-    .int("Available quantity must be an integer")
-    .min(0, "Available quantity cannot be negative")
-    .default(1),
-  totalQuantity: z
-    .number()
-    .int("Total quantity must be an integer")
-    .min(1, "Total quantity must be at least 1")
-    .default(1),
-  condition: equipmentConditionSchema.default("Excellent"),
-  brand: z
-    .string()
-    .trim()
-    .min(1, "Brand is required"),
-  model: z
-    .string()
-    .trim()
-    .min(1, "Model is required"),
-  imageUrl: z
-    .string()
-    .trim()
-    .min(5, "Equipment image URL is required"),
-  images: z.array(z.string()).optional(),
-  rentalTerms: z
-    .string()
-    .trim()
-    .min(5, "Rental terms must be at least 5 characters"),
-  specifications: z.array(specificationSchema).optional(),
-  featured: z.boolean().optional().default(false),
-}).refine((data) => data.name || data.title, {
-  message: "Either name or title must be provided for the equipment",
-  path: ["name"],
-});
+const specificationsPreprocessor = z.preprocess((val) => {
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === "object") {
+    return Object.entries(val).map(([label, value]) => ({
+      label,
+      value: String(value),
+    }));
+  }
+  return [];
+}, z.array(specificationSchema).optional().default([]));
 
-export const updateEquipmentSchema = z.object({
-  name: z.string().trim().min(2).max(150).optional(),
-  title: z.string().trim().min(2).max(150).optional(),
-  description: z.string().trim().min(10).max(3000).optional(),
-  category: z.string().trim().min(2).optional(),
-  location: z.string().trim().min(2).optional(),
-  rentalPrice: z.number().positive().optional(),
-  rentalType: rentalTypeSchema.optional(),
-  availableQuantity: z.number().int().min(0).optional(),
-  totalQuantity: z.number().int().min(1).optional(),
-  condition: equipmentConditionSchema.optional(),
-  brand: z.string().trim().min(1).optional(),
-  model: z.string().trim().min(1).optional(),
-  imageUrl: z.string().trim().min(5).optional(),
-  images: z.array(z.string()).optional(),
-  rentalTerms: z.string().trim().min(5).optional(),
-  specifications: z.array(specificationSchema).optional(),
-  featured: z.boolean().optional(),
-});
+const rentalTermsSchema = z.preprocess((val) => {
+  if (Array.isArray(val)) {
+    return val.filter((t) => typeof t === "string" && t.trim().length > 0).join("\n").trim();
+  }
+  if (typeof val === "string") {
+    return val.trim();
+  }
+  return val;
+}, z.string().min(5, "Rental terms must be at least 5 characters"));
+
+const preprocessEquipmentInput = (raw: unknown) => {
+  if (!raw || typeof raw !== "object") return raw;
+  const input = { ...(raw as Record<string, any>) };
+
+  // Harmonize rentalTerms and terms
+  if (!input.rentalTerms && input.terms) {
+    input.rentalTerms = input.terms;
+  }
+  if (!input.terms && input.rentalTerms) {
+    input.terms = input.rentalTerms;
+  }
+
+  // Preprocess rentalTerms if array
+  if (Array.isArray(input.rentalTerms)) {
+    input.rentalTerms = input.rentalTerms
+      .filter((t: any) => typeof t === "string" && t.trim().length > 0)
+      .join("\n")
+      .trim();
+  }
+
+  // Fallback default for rentalTerms if empty
+  if (!input.rentalTerms || (typeof input.rentalTerms === "string" && input.rentalTerms.trim().length < 5)) {
+    input.rentalTerms = "Standard commercial equipment rental terms and operating safety guidelines apply.";
+  }
+
+  // Harmonize name and title
+  if (!input.name && input.title) {
+    input.name = input.title;
+  }
+  if (!input.title && input.name) {
+    input.title = input.name;
+  }
+
+  // Harmonize imageUrl and images
+  if (!input.imageUrl && Array.isArray(input.images) && input.images.length > 0) {
+    input.imageUrl = input.images[0];
+  }
+  if (input.imageUrl && (!Array.isArray(input.images) || input.images.length === 0)) {
+    input.images = [input.imageUrl];
+  }
+
+  return input;
+};
+
+export const createEquipmentSchema = z.preprocess(
+  preprocessEquipmentInput,
+  z.object({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Equipment name must be at least 2 characters")
+      .max(150, "Equipment name cannot exceed 150 characters")
+      .optional(),
+    title: z
+      .string()
+      .trim()
+      .min(2, "Equipment title must be at least 2 characters")
+      .max(150, "Equipment title cannot exceed 150 characters")
+      .optional(),
+    description: z
+      .string()
+      .trim()
+      .min(10, "Description must be at least 10 characters")
+      .max(3000, "Description cannot exceed 3000 characters"),
+    category: z
+      .string()
+      .trim()
+      .min(2, "Category must be at least 2 characters"),
+    location: z
+      .string()
+      .trim()
+      .min(2, "Location must be at least 2 characters"),
+    rentalPrice: z.coerce
+      .number()
+      .positive("Rental price must be greater than 0"),
+    rentalType: rentalTypeSchema.default("Daily"),
+    availableQuantity: z.coerce
+      .number()
+      .int("Available quantity must be an integer")
+      .min(0, "Available quantity cannot be negative")
+      .default(1),
+    totalQuantity: z.coerce
+      .number()
+      .int("Total quantity must be an integer")
+      .min(1, "Total quantity must be at least 1")
+      .default(1),
+    condition: equipmentConditionSchema.default("Excellent"),
+    brand: z
+      .string()
+      .trim()
+      .min(1, "Brand is required"),
+    model: z
+      .string()
+      .trim()
+      .min(1, "Model is required"),
+    imageUrl: z
+      .string()
+      .trim()
+      .min(5, "Equipment image URL is required"),
+    images: z.array(z.string()).optional(),
+    rentalTerms: rentalTermsSchema.default("Standard commercial equipment rental terms and operating safety guidelines apply."),
+    terms: z.any().optional(),
+    specifications: specificationsPreprocessor,
+    featured: z.boolean().optional().default(false),
+  }).refine((data) => data.name || data.title, {
+    message: "Either name or title must be provided for the equipment",
+    path: ["name"],
+  })
+);
+
+export const updateEquipmentSchema = z.preprocess(
+  preprocessEquipmentInput,
+  z.object({
+    name: z.string().trim().min(2).max(150).optional(),
+    title: z.string().trim().min(2).max(150).optional(),
+    description: z.string().trim().min(10).max(3000).optional(),
+    category: z.string().trim().min(2).optional(),
+    location: z.string().trim().min(2).optional(),
+    rentalPrice: z.coerce.number().positive().optional(),
+    rentalType: rentalTypeSchema.optional(),
+    availableQuantity: z.coerce.number().int().min(0).optional(),
+    totalQuantity: z.coerce.number().int().min(1).optional(),
+    condition: equipmentConditionSchema.optional(),
+    brand: z.string().trim().min(1).optional(),
+    model: z.string().trim().min(1).optional(),
+    imageUrl: z.string().trim().min(5).optional(),
+    images: z.array(z.string()).optional(),
+    rentalTerms: rentalTermsSchema.optional(),
+    terms: z.any().optional(),
+    specifications: z.preprocess((val) => {
+      if (Array.isArray(val)) return val;
+      if (val && typeof val === "object") {
+        return Object.entries(val).map(([label, value]) => ({
+          label,
+          value: String(value),
+        }));
+      }
+      return val;
+    }, z.array(specificationSchema).optional()),
+    featured: z.boolean().optional(),
+  })
+);
 
 export const adminEquipmentStatusSchema = z.object({
   status: z.enum(["Approved", "Rejected"]).optional().default("Rejected"),

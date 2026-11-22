@@ -34,10 +34,18 @@ export class EquipmentService {
     const equipmentName = data.name || data.title || "Unnamed Equipment";
     const equipmentTitle = data.title || data.name || equipmentName;
 
+    const equipmentData = { ...(data as any) };
+    const rentalTerms =
+      equipmentData.rentalTerms ||
+      equipmentData.terms ||
+      "Standard commercial equipment rental terms and operating safety guidelines apply.";
+    delete equipmentData.terms;
+
     const newEquipment = new Equipment({
-      ...data,
+      ...equipmentData,
       name: equipmentName,
       title: equipmentTitle,
+      rentalTerms,
       owner: ownerObjectId,
       status: "Pending", // Owner listings strictly default to Pending
       availableQuantity: data.availableQuantity ?? 1,
@@ -159,6 +167,11 @@ export class EquipmentService {
     delete updateData.approvedBy;
     delete updateData.rejectedAt;
     delete updateData.rejectedBy;
+
+    if (updateData.terms && !updateData.rentalTerms) {
+      updateData.rentalTerms = updateData.terms;
+    }
+    delete updateData.terms;
 
     if (updateData.name && !updateData.title) {
       updateData.title = updateData.name;
@@ -520,6 +533,11 @@ export class EquipmentService {
 
     const updateData: Record<string, any> = { ...data };
     delete updateData.owner;
+
+    if (updateData.terms && !updateData.rentalTerms) {
+      updateData.rentalTerms = updateData.terms;
+    }
+    delete updateData.terms;
 
     if (updateData.name && !updateData.title) {
       updateData.title = updateData.name;
