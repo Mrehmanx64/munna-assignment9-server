@@ -1,32 +1,50 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/authService";
+import { JwtService } from "../services/jwtService";
 import { ResponseFormatter } from "../utils/ApiResponse";
 import { asyncHandler } from "../utils/asyncHandler";
 import { env } from "../config/env";
 import { HttpStatus } from "../types";
 
 // Cookie helper
-const setAuthCookie = (res: Response, token: string): void => {
+const setAuthCookie = (res: Response, token: string, req?: Request): void => {
+  // If running in production OR if request was received over HTTPS (e.g. Render, Vercel reverse proxy),
+  // we MUST use secure: true and sameSite: "none" so browsers accept cross-site cookies.
+  const isHttps =
+    env.NODE_ENV === "production" ||
+    Boolean(req && (req.secure || req.headers["x-forwarded-proto"] === "https"));
+
   res.cookie("accessToken", token, {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    secure: isHttps,
+    sameSite: isHttps ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/",
+  });
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: isHttps ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
   });
 };
 
-const clearAuthCookie = (res: Response): void => {
+const clearAuthCookie = (res: Response, req?: Request): void => {
+  const isHttps =
+    env.NODE_ENV === "production" ||
+    Boolean(req && (req.secure || req.headers["x-forwarded-proto"] === "https"));
+
   res.clearCookie("accessToken", {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    secure: isHttps,
+    sameSite: isHttps ? "none" : "lax",
     path: "/",
   });
   res.clearCookie("token", {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    secure: isHttps,
+    sameSite: isHttps ? "none" : "lax",
     path: "/",
   });
 };
@@ -37,7 +55,7 @@ const clearAuthCookie = (res: Response): void => {
  */
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const result = await AuthService.register(req.body);
-  setAuthCookie(res, result.token);
+  setAuthCookie(res, result.token, req);
 
   ResponseFormatter.send(
     res,
@@ -53,7 +71,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
  */
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const result = await AuthService.login(req.body);
-  setAuthCookie(res, result.token);
+  setAuthCookie(res, result.token, req);
 
   ResponseFormatter.ok(res, "Login successful", result);
 });
@@ -65,7 +83,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
  */
 export const googleAuth = asyncHandler(async (req: Request, res: Response) => {
   const result = await AuthService.googleAuth(req.body);
-  setAuthCookie(res, result.token);
+  setAuthCookie(res, result.token, req);
 
   ResponseFormatter.ok(res, "Google authentication successful", result);
 });
@@ -77,15 +95,18 @@ export const googleAuth = asyncHandler(async (req: Request, res: Response) => {
  */
 export const getMe = asyncHandler(async (req: Request, res: Response) => {
   const user = await AuthService.getMe(req.user!.id);
-  ResponseFormatter.ok(res, "User profile retrieved successfully", { user });
+  // Re-generate fresh access token to extend session and support cross-domain header authentication
+  const token = JwtService.generateAccessToken(user);
+  setAuthCookie(res, token, req);
+  ResponseFormatter.ok(res, "User profile retrieved successfully", { user, token });
 });
 
 /**
  * Logout and clear session
  * POST /api/auth/logout
  */
-export const logout = asyncHandler(async (_req: Request, res: Response) => {
-  clearAuthCookie(res);
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  clearAuthCookie(res, req);
   ResponseFormatter.ok(res, "Successfully logged out", null);
 });
 
