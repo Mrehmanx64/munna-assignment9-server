@@ -23,6 +23,12 @@ const clearAuthCookie = (res: Response): void => {
     sameSite: env.NODE_ENV === "production" ? "none" : "lax",
     path: "/",
   });
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/",
+  });
 };
 
 /**
@@ -71,7 +77,7 @@ export const googleAuth = asyncHandler(async (req: Request, res: Response) => {
  */
 export const getMe = asyncHandler(async (req: Request, res: Response) => {
   const user = await AuthService.getMe(req.user!.id);
-  ResponseFormatter.ok(res, "User profile retrieved successfully", user);
+  ResponseFormatter.ok(res, "User profile retrieved successfully", { user });
 });
 
 /**

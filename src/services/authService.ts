@@ -32,9 +32,9 @@ export class AuthService {
       throw ApiError.conflict("An account with this email address already exists");
     }
 
-    // Role security: only "customer" or "owner" allowed on registration.
-    // Never allow client self-assignment of "admin".
-    const sanitizedRole: UserRole = input.role === "owner" ? "owner" : "customer";
+    // Role security: Public registration always defaults to "customer".
+    // Customer cannot register directly as Owner or Admin. Only Admin can promote.
+    const sanitizedRole: UserRole = "customer";
 
     const hashedPassword = await bcrypt.hash(input.password, 10);
 
@@ -105,24 +105,74 @@ export class AuthService {
 
   /**
    * Handles Google OAuth sign-in and registration
-   * Guaranteed: new Google registrations strictly default to "customer" role
+   * Cryptographically verifies Google ID token with Google's public tokeninfo endpoint.
+   * Guaranteed: new Google registrations strictly default to "customer" role.
+   * Never authenticates based solely on client-submitted email.
    */
   static async googleAuth(input: GoogleAuthInput): Promise<AuthResponseData> {
-    if (!input.email) {
-      throw ApiError.badRequest("Google account email is required");
+    if (!input.idToken) {
+      throw ApiError.badRequest("Google ID token is required");
     }
 
-    const email = input.email.toLowerCase();
+    // 1. Verify Google ID token signature and claims via official Google OAuth2 tokeninfo service
+    let googlePayload: any;
+    try {
+      const response = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(input.idToken)}`,
+        { headers: { "User-Agent": "Rentora-Auth/1.0" } }
+      );
+      if (!response.ok) {
+        throw new Error(`Google token service responded with status ${response.status}`);
+      }
+      googlePayload = await response.json();
+    } catch (err: any) {
+      throw ApiError.unauthorized(`Google ID token verification failed: ${err.message}`);
+    }
+
+    if (!googlePayload || googlePayload.error || !googlePayload.email) {
+      throw ApiError.unauthorized("Google authentication failed: Missing verified email identity");
+    }
+
+    // 2. Validate token issuer
+    const validIssuers = ["accounts.google.com", "https://accounts.google.com"];
+    if (!validIssuers.includes(googlePayload.iss)) {
+      throw ApiError.unauthorized("Invalid Google token issuer");
+    }
+
+    // 3. Validate audience if GOOGLE_CLIENT_ID is configured in environment
+    const configuredAudience = process.env.GOOGLE_CLIENT_ID?.trim();
+    if (configuredAudience && googlePayload.aud !== configuredAudience) {
+      throw ApiError.unauthorized("Google token audience mismatch");
+    }
+
+    // 4. Validate token expiration
+    const expSeconds = Number(googlePayload.exp);
+    if (!expSeconds || expSeconds * 1000 <= Date.now()) {
+      throw ApiError.unauthorized("Google ID token has expired");
+    }
+
+    // 5. Validate email_verified claim
+    const isEmailVerified =
+      googlePayload.email_verified === "true" || googlePayload.email_verified === true;
+    if (!isEmailVerified) {
+      throw ApiError.unauthorized("Google account email is not verified");
+    }
+
+    // 6. Verified user attributes from verified token
+    const email = googlePayload.email.toLowerCase().trim();
+    const name = googlePayload.name || email.split("@")[0] || "Google User";
+    const avatarUrl = googlePayload.picture || undefined;
+
     let user = await User.findOne({ email });
 
     if (!user) {
-      // New user from Google -> STRICT REQUIREMENT: Default role is "customer" (Customer / Renter)
+      // New user from Google -> STRICT REQUIREMENT: Default role is "customer"
       user = await User.create({
-        name: input.name || email.split("@")[0] || "Google User",
+        name,
         email,
         role: "customer", // Enforced default Google registration role: Customer
-        avatarUrl: input.avatarUrl || undefined,
-        image: input.avatarUrl || undefined,
+        avatarUrl,
+        image: avatarUrl,
         emailVerified: true,
       });
 
@@ -130,7 +180,7 @@ export class AuthService {
       if (db) {
         await db.collection("account").insertOne({
           userId: user._id.toString(),
-          accountId: input.idToken || user._id.toString(),
+          accountId: googlePayload.sub || user._id.toString(),
           providerId: "google",
           createdAt: new Date(),
           updatedAt: new Date(),

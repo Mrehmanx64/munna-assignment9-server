@@ -15,13 +15,15 @@ export const registerSchema = z
     password: z
       .string()
       .min(6, "Password must be at least 6 characters")
-      .max(100, "Password cannot exceed 100 characters"),
+      .max(100, "Password cannot exceed 100 characters")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least one lowercase letter"),
     confirmPassword: z.string().optional(),
     role: z
       .enum(["customer", "owner", "renter"])
       .optional()
       .default("customer")
-      .transform((val) => (val === "renter" ? "customer" : val)),
+      .transform(() => "customer" as const),
     phone: z.string().trim().optional(),
     address: z.string().trim().optional(),
     avatarUrl: z.string().trim().url("Invalid avatar URL format").optional().or(z.literal("")),
@@ -48,10 +50,7 @@ export const loginSchema = z.object({
 });
 
 export const googleAuthSchema = z.object({
-  idToken: z.string().optional(),
-  email: z.string().email("Invalid Google account email").optional(),
-  name: z.string().min(1).optional(),
-  avatarUrl: z.string().url().optional(),
+  idToken: z.string().min(10, "Google ID token is required"),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
