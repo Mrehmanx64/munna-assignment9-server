@@ -24,6 +24,12 @@ export interface EquipmentAvailabilityResult {
   availableQuantity: number;
   isAvailable: boolean;
   maxBookable: number;
+  bookedSchedules?: Array<{
+    startDate: string;
+    endDate: string;
+    quantity: number;
+    bookingStatus: string;
+  }>;
 }
 
 export class BookingService {
@@ -100,17 +106,11 @@ export class BookingService {
    */
   public static async checkEquipmentAvailability(
     equipmentId: string,
-    startDateStr: string,
-    endDateStr: string,
+    startDateStr?: string,
+    endDateStr?: string,
     requestedQuantity = 1
   ): Promise<EquipmentAvailabilityResult> {
     const eqObjectId = this.validateObjectId(equipmentId, "Equipment");
-    const start = new Date(startDateStr);
-    const end = new Date(endDateStr);
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
-      throw ApiError.badRequest("Invalid rental date range: end date must be on or after start date");
-    }
 
     const equipment = await Equipment.findById(eqObjectId);
     if (!equipment) {
@@ -125,17 +125,12 @@ export class BookingService {
 
     // Active checkout hold window: 30 minutes
     const holdCutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const now = new Date();
 
-    // If start and end are same day, set effectiveEnd to end of that day for proper overlap query
-    const effectiveEnd =
-      end.getTime() === start.getTime()
-        ? new Date(end.getTime() + 24 * 60 * 60 * 1000 - 1)
-        : end;
-
-    const overlapFilter: Record<string, any> = {
+    // Query all upcoming confirmed, active, or pending bookings for this equipment
+    const upcomingBookings = await Booking.find({
       equipment: eqObjectId,
-      startDate: { $lt: effectiveEnd },
-      endDate: { $gt: start },
+      endDate: { $gte: now },
       $or: [
         { bookingStatus: { $in: ["Confirmed", "Active"] } },
         {
@@ -144,23 +139,80 @@ export class BookingService {
           createdAt: { $gte: holdCutoff },
         },
       ],
-    };
+    })
+      .select("startDate endDate quantity bookingStatus")
+      .sort({ startDate: 1 })
+      .lean();
 
-    const overlappingBookings = await Booking.find(overlapFilter).select("quantity");
-    const bookedQuantity = overlappingBookings.reduce(
-      (sum, b) => sum + (b.quantity || 1),
-      0
-    );
+    const bookedSchedules = (Array.isArray(upcomingBookings) ? upcomingBookings : [])
+      .filter((b) => b && b.startDate && b.endDate)
+      .map((b) => {
+        const s = b.startDate instanceof Date ? b.startDate : new Date(b.startDate);
+        const e = b.endDate instanceof Date ? b.endDate : new Date(b.endDate);
+        const validStart = !isNaN(s.getTime());
+        const validEnd = !isNaN(e.getTime());
+        return {
+          startDate: validStart ? s.toISOString() : new Date().toISOString(),
+          endDate: validEnd ? e.toISOString() : new Date().toISOString(),
+          quantity: b.quantity || 1,
+          bookingStatus: b.bookingStatus || "Confirmed",
+        };
+      });
 
-    const availableQuantity = Math.max(0, totalStock - bookedQuantity);
-    const isAvailable = availableQuantity >= requestedQuantity;
+    if (startDateStr && endDateStr) {
+      const start = new Date(startDateStr);
+      const end = new Date(endDateStr);
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
+        throw ApiError.badRequest("Invalid rental date range: end date must be on or after start date");
+      }
+
+      // If start and end are same day, set effectiveEnd to end of that day for proper overlap query
+      const effectiveEnd =
+        end.getTime() === start.getTime()
+          ? new Date(end.getTime() + 24 * 60 * 60 * 1000 - 1)
+          : end;
+
+      const overlapFilter: Record<string, any> = {
+        equipment: eqObjectId,
+        startDate: { $lt: effectiveEnd },
+        endDate: { $gt: start },
+        $or: [
+          { bookingStatus: { $in: ["Confirmed", "Active"] } },
+          {
+            bookingStatus: "Pending",
+            paymentStatus: "Pending",
+            createdAt: { $gte: holdCutoff },
+          },
+        ],
+      };
+
+      const overlappingBookings = await Booking.find(overlapFilter).select("quantity");
+      const bookedQuantity = overlappingBookings.reduce(
+        (sum, b) => sum + (b.quantity || 1),
+        0
+      );
+
+      const availableQuantity = Math.max(0, totalStock - bookedQuantity);
+      const isAvailable = availableQuantity >= requestedQuantity;
+
+      return {
+        totalQuantity: totalStock,
+        bookedQuantity,
+        availableQuantity,
+        isAvailable,
+        maxBookable: availableQuantity,
+        bookedSchedules,
+      };
+    }
 
     return {
       totalQuantity: totalStock,
-      bookedQuantity,
-      availableQuantity,
-      isAvailable,
-      maxBookable: availableQuantity,
+      bookedQuantity: 0,
+      availableQuantity: totalStock,
+      isAvailable: totalStock >= requestedQuantity,
+      maxBookable: totalStock,
+      bookedSchedules,
     };
   }
 

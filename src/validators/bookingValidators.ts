@@ -18,13 +18,11 @@ export const createBookingSchema = z
     contactNumber: z
       .string()
       .trim()
-      .min(3, "Contact number must be at least 3 characters")
-      .default("+1 (555) 234-5678"),
+      .min(3, "Contact number must be at least 3 characters"),
     deliveryAddress: z
       .string()
       .trim()
-      .min(2, "Delivery address must be at least 2 characters")
-      .default("Jobsite Delivery Address"),
+      .min(2, "Delivery address must be at least 2 characters"),
     additionalNotes: z.string().trim().optional(),
   })
   .refine(
@@ -51,11 +49,14 @@ export const updateBookingStatusSchema = z.object({
 
 export const availabilityQuerySchema = z
   .object({
-    startDate: z.string().min(1, "startDate is required"),
-    endDate: z.string().min(1, "endDate is required"),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    quantity: z.preprocess((val) => (val ? Number(val) : 1), z.number().int().min(1).default(1)),
   })
   .refine(
     (data) => {
+      if (!data.startDate && !data.endDate) return true;
+      if (!data.startDate || !data.endDate) return false;
       const start = new Date(data.startDate);
       const end = new Date(data.endDate);
       return !isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start;
